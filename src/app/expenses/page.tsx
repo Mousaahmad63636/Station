@@ -34,6 +34,7 @@ export default function ExpensesPage() {
   const [editingCategory, setEditingCategory] = useState<any>(null)
   const [isAddCategoryOpen, setIsAddCategoryOpen] = useState(false)
   const [isEditCategoryOpen, setIsEditCategoryOpen] = useState(false)
+  const [isAddExpenseOpen, setIsAddExpenseOpen] = useState(false)
 
   useEffect(() => {
     loadData()
@@ -110,6 +111,29 @@ export default function ExpensesPage() {
   const openEditCategory = (category: any) => {
     setEditingCategory(category)
     setIsEditCategoryOpen(true)
+  }
+
+  const handleAddExpense = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    const formData = new FormData(event.currentTarget)
+    
+    try {
+      await addExpense({
+        category: formData.get('category') as string,
+        description: formData.get('description') as string,
+        amount: parseFloat(formData.get('amount') as string),
+        payment_method: 'Cash', // Default payment method
+        vendor: undefined,
+        receipt_number: undefined
+      })
+      
+      setIsAddExpenseOpen(false)
+      await loadData()
+      ;(event.target as HTMLFormElement).reset()
+    } catch (error) {
+      console.error('Error adding expense:', error)
+      alert('Error adding expense')
+    }
   }
 
   // Get all categories for filtering (from database + 'all' option)
@@ -278,72 +302,66 @@ export default function ExpensesPage() {
               </div>
             </DialogContent>
           </Dialog>
-          <Dialog>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              Add Expense
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle>Add New Expense</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="expense-category">Category</Label>
-                <Select>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {expenseCategories.map((category: any) => (
-                      <SelectItem key={category.id} value={category.name}>
-                        {category.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="expense-description">Description</Label>
-                <Textarea 
-                  id="expense-description" 
-                  placeholder="Enter expense description"
-                  rows={3}
-                />
-              </div>
-              <div>
-                <Label htmlFor="expense-amount">Amount</Label>
-                <Input id="expense-amount" type="number" placeholder="0.00" />
-              </div>
-              <div>
-                <Label htmlFor="payment-method">Payment Method</Label>
-                <Select>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select payment method" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {paymentMethods.map((method) => (
-                      <SelectItem key={method} value={method}>
-                        {method}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="vendor">Vendor/Supplier</Label>
-                <Input id="vendor" placeholder="Enter vendor name" />
-              </div>
-              <div>
-                <Label htmlFor="receipt-number">Receipt Number</Label>
-                <Input id="receipt-number" placeholder="Enter receipt number" />
-              </div>
-              <Button className="w-full">Add Expense</Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+          <Dialog open={isAddExpenseOpen} onOpenChange={setIsAddExpenseOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="mr-2 h-4 w-4" />
+                Add Expense
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>Add New Expense</DialogTitle>
+                <p className="text-sm text-muted-foreground">Record a new expense</p>
+              </DialogHeader>
+              <form onSubmit={handleAddExpense} className="space-y-4 mt-4">
+                <div className="space-y-2">
+                  <Label htmlFor="expense-category">Category *</Label>
+                  <Select name="category" required>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {expenseCategories.map((category: any) => (
+                        <SelectItem key={category.id} value={category.name}>
+                          {category.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="expense-description">Description *</Label>
+                  <Textarea 
+                    id="expense-description" 
+                    name="description"
+                    placeholder="What was this expense for?"
+                    rows={3}
+                    required
+                    className="resize-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="expense-amount">Amount *</Label>
+                  <Input 
+                    id="expense-amount" 
+                    name="amount"
+                    type="number" 
+                    step="0.01"
+                    placeholder="0.00" 
+                    required
+                    className="focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div className="flex gap-2 pt-2">
+                  <Button type="button" variant="outline" className="flex-1" onClick={() => setIsAddExpenseOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button type="submit" className="flex-1">Add Expense</Button>
+                </div>
+              </form>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 
