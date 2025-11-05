@@ -179,13 +179,13 @@ export default function ExpensesPage() {
                 Manage Categories
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden">
-              <DialogHeader className="pb-4">
+            <DialogContent className="max-w-5xl max-h-[85vh] flex flex-col">
+              <DialogHeader className="pb-4 flex-shrink-0">
                 <DialogTitle className="text-xl font-semibold">Manage Expense Categories</DialogTitle>
                 <p className="text-sm text-muted-foreground">Add, edit, or remove expense categories for better organization</p>
               </DialogHeader>
-              <div className="space-y-6">
-                <div className="flex justify-between items-center">
+              <div className="flex-1 overflow-hidden flex flex-col space-y-4">
+                <div className="flex justify-between items-center flex-shrink-0">
                   <div className="text-sm text-muted-foreground">
                     {expenseCategories.length} categories total
                   </div>
@@ -232,39 +232,41 @@ export default function ExpensesPage() {
                     </DialogContent>
                   </Dialog>
                 </div>
-                <div className="border rounded-lg overflow-hidden">
+                <div className="flex-1 overflow-auto border rounded-lg">
                   <Table>
-                    <TableHeader>
+                    <TableHeader className="sticky top-0 bg-white z-10">
                       <TableRow className="bg-muted/50">
-                        <TableHead className="font-semibold">Category Name</TableHead>
-                        <TableHead className="font-semibold">Description</TableHead>
-                        <TableHead className="font-semibold w-24">Actions</TableHead>
+                        <TableHead className="font-semibold min-w-[150px]">Category Name</TableHead>
+                        <TableHead className="font-semibold min-w-[200px]">Description</TableHead>
+                        <TableHead className="font-semibold w-20 text-center">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {expenseCategories.map((category) => (
                         <TableRow key={category.id} className="hover:bg-muted/30">
-                          <TableCell className="font-medium py-4">{category.name}</TableCell>
-                          <TableCell className="py-4 text-muted-foreground">
+                          <TableCell className="font-medium py-3">{category.name}</TableCell>
+                          <TableCell className="py-3 text-muted-foreground text-sm">
                             {category.description || 'No description'}
                           </TableCell>
-                          <TableCell className="py-4">
-                            <div className="flex gap-1">
+                          <TableCell className="py-3">
+                            <div className="flex gap-1 justify-center">
                               <Button 
                                 variant="ghost" 
                                 size="sm"
                                 onClick={() => openEditCategory(category)}
-                                className="h-8 w-8 p-0 hover:bg-blue-100"
+                                className="h-7 w-7 p-0 hover:bg-blue-100"
+                                title="Edit category"
                               >
-                                <Edit className="h-4 w-4 text-blue-600" />
+                                <Edit className="h-3.5 w-3.5 text-blue-600" />
                               </Button>
                               <Button 
                                 variant="ghost" 
                                 size="sm"
-                                className="h-8 w-8 p-0 hover:bg-red-100"
+                                className="h-7 w-7 p-0 hover:bg-red-100"
                                 onClick={() => handleDeleteCategory(category.id, category.name)}
+                                title="Delete category"
                               >
-                                <Trash2 className="h-4 w-4 text-red-600" />
+                                <Trash2 className="h-3.5 w-3.5 text-red-600" />
                               </Button>
                             </div>
                           </TableCell>
