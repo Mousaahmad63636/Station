@@ -292,10 +292,14 @@ export const refillContainer = async (
       invoice_number: invoiceNumber
     })
     
-    // 4. Add to expenses
+    // 4. Add to expenses with detailed fuel type info
+    const expenseDescription = supplier 
+      ? `Fuel Purchase: ${litersAdded}L of ${container.fuel_type} for ${container.name} from ${supplier}`
+      : `Fuel Purchase: ${litersAdded}L of ${container.fuel_type} for ${container.name}`
+    
     await addExpense({
       category: 'Fuel Purchase',
-      description: `Refilled ${container.name} - ${litersAdded}L of ${container.fuel_type}`,
+      description: expenseDescription,
       amount: totalCost,
       payment_method: 'Bank Transfer',
       vendor: supplier

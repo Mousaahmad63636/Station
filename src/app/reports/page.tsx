@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { 
   BarChart3, 
   Download, 
@@ -295,9 +296,18 @@ export default function ReportsPage() {
         </Card>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
-        {/* Today's Summary */}
-        <Card>
+      {/* Tabs for Product and Fuel Reports */}
+      <Tabs defaultValue="overview" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="products">Products</TabsTrigger>
+          <TabsTrigger value="fuel">Fuel</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="overview">
+          <div className="grid gap-6 md:grid-cols-2">
+            {/* Today's Summary */}
+            <Card>
           <CardHeader>
             <CardTitle>Today's Performance</CardTitle>
           </CardHeader>
@@ -433,7 +443,85 @@ export default function ReportsPage() {
             </Table>
           </CardContent>
         </Card>
-      </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="products">
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Package className="h-5 w-5" />
+                  Product Sales & Profit
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-4 md:grid-cols-3">
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-green-600">
+                      ${productProfit.profit?.toFixed(2) || '0.00'}
+                    </div>
+                    <p className="text-sm text-muted-foreground">Total Profit</p>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold">
+                      ${productProfit.revenue?.toFixed(2) || '0.00'}
+                    </div>
+                    <p className="text-sm text-muted-foreground">Revenue</p>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold">
+                      {productProfit.margin?.toFixed(1) || '0.0'}%
+                    </div>
+                    <p className="text-sm text-muted-foreground">Margin</p>
+                  </div>
+                </div>
+                <div className="mt-4 text-xs text-muted-foreground">
+                  Cost: ${productProfit.cost?.toFixed(2) || '0.00'} (estimated)
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="fuel">
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Fuel className="h-5 w-5" />
+                  Fuel Sales & Profit
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-4 md:grid-cols-3">
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-green-600">
+                      ${fuelProfit.profit?.toFixed(2) || '0.00'}
+                    </div>
+                    <p className="text-sm text-muted-foreground">Total Profit</p>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold">
+                      ${fuelProfit.revenue?.toFixed(2) || '0.00'}
+                    </div>
+                    <p className="text-sm text-muted-foreground">Revenue</p>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold">
+                      {fuelProfit.margin?.toFixed(1) || '0.0'}%
+                    </div>
+                    <p className="text-sm text-muted-foreground">Margin</p>
+                  </div>
+                </div>
+                <div className="mt-4 text-xs text-muted-foreground">
+                  Cost: ${fuelProfit.cost?.toFixed(2) || '0.00'} (estimated at $1.20/L)
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }
