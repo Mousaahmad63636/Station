@@ -33,6 +33,7 @@ export default function PumpsPage() {
   const [isAddContainerOpen, setIsAddContainerOpen] = useState(false)
   const [editingContainer, setEditingContainer] = useState<any>(null)
   const [isEditContainerOpen, setIsEditContainerOpen] = useState(false)
+  const [isAddPumpOpen, setIsAddPumpOpen] = useState(false)
 
   useEffect(() => {
     loadData()
@@ -157,6 +158,37 @@ export default function PumpsPage() {
   const openEditContainer = (container: any) => {
     setEditingContainer(container)
     setIsEditContainerOpen(true)
+  }
+
+  const handleAddPump = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    const formData = new FormData(event.currentTarget)
+    
+    const containerId = formData.get('container') as string
+    const selectedContainer = containers.find(c => c.id === containerId)
+    
+    if (!selectedContainer) {
+      alert('Please select a container')
+      return
+    }
+    
+    try {
+      await addPump({
+        name: formData.get('name') as string,
+        container_id: containerId,
+        fuel_type: selectedContainer.fuel_type,
+        is_active: true,
+        total_counter: 0,
+        daily_counter: 0
+      })
+      
+      setIsAddPumpOpen(false)
+      await loadData()
+      ;(event.target as HTMLFormElement).reset()
+    } catch (error) {
+      console.error('Error adding pump:', error)
+      alert('Error adding pump')
+    }
   }
 
   if (loading) {
@@ -336,41 +368,60 @@ export default function PumpsPage() {
               </div>
             </DialogContent>
           </Dialog>
-          <Dialog>
+          <Dialog open={isAddPumpOpen} onOpenChange={setIsAddPumpOpen}>
             <DialogTrigger asChild>
               <Button>
                 <Plus className="mr-2 h-4 w-4" />
                 Add Pump
               </Button>
             </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Add New Pump</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="pump-name">Pump Name</Label>
-                <Input id="pump-name" placeholder="e.g., Pump G" />
-              </div>
-              <div>
-                <Label htmlFor="container">Container</Label>
-                <Select>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select container" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {containers.map((container) => (
-                      <SelectItem key={container.id} value={container.id}>
-                        {container.name} - {container.fuel_type}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <Button className="w-full">Add Pump</Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>Add New Pump</DialogTitle>
+                <p className="text-sm text-muted-foreground">Create a new fuel pump</p>
+              </DialogHeader>
+              <form onSubmit={handleAddPump} className="space-y-4 mt-4">
+                <div className="space-y-2">
+                  <Label htmlFor="pump-name">Pump Name *</Label>
+                  <Input 
+                    id="pump-name" 
+                    name="name"
+                    placeholder="e.g., Pump A, Pump 1" 
+                    required
+                    className="focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="pump-container">Container *</Label>
+                  <Select name="container" required>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select container" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {containers.map((container) => (
+                        <SelectItem key={container.id} value={container.id}>
+                          {container.name} - {container.fuel_type}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {containers.length === 0 && (
+                    <p className="text-sm text-muted-foreground">
+                      No containers available. Create a container first using "Manage Containers".
+                    </p>
+                  )}
+                </div>
+                <div className="flex gap-2 pt-2">
+                  <Button type="button" variant="outline" className="flex-1" onClick={() => setIsAddPumpOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button type="submit" className="flex-1" disabled={containers.length === 0}>
+                    Add Pump
+                  </Button>
+                </div>
+              </form>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 
