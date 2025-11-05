@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -21,70 +21,33 @@ import {
   Calendar,
   Filter
 } from 'lucide-react'
+import { getExpenses, addExpense, updateExpense, deleteExpense } from '@/lib/database'
 
 export default function ExpensesPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('all')
   const [selectedMonth, setSelectedMonth] = useState('all')
+  const [expenses, setExpenses] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
 
-  // Mock data - will be replaced with real data from Supabase
-  const expenses = [
-    {
-      id: '1',
-      category: 'Utilities',
-      description: 'Electricity Bill - November',
-      amount: 450.00,
-      payment_method: 'Bank Transfer',
-      receipt_number: 'ELC-2024-001',
-      vendor: 'City Electric Company',
-      created_at: '2024-11-01T10:30:00Z'
-    },
-    {
-      id: '2',
-      category: 'Maintenance',
-      description: 'Pump A Repair - Nozzle Replacement',
-      amount: 125.50,
-      payment_method: 'Cash',
-      receipt_number: 'MNT-2024-015',
-      vendor: 'Fuel Tech Services',
-      created_at: '2024-11-02T14:15:00Z'
-    },
-    {
-      id: '3',
-      category: 'Inventory',
-      description: 'Engine Oil Stock Purchase',
-      amount: 850.00,
-      payment_method: 'Credit Card',
-      receipt_number: 'INV-2024-087',
-      vendor: 'Oil Suppliers Ltd',
-      created_at: '2024-11-03T09:45:00Z'
-    },
-    {
-      id: '4',
-      category: 'Insurance',
-      description: 'Monthly Insurance Premium',
-      amount: 320.00,
-      payment_method: 'Bank Transfer',
-      receipt_number: 'INS-2024-011',
-      vendor: 'SafeGuard Insurance',
-      created_at: '2024-11-04T11:00:00Z'
-    },
-    {
-      id: '5',
-      category: 'Fuel Purchase',
-      description: 'Gasoline Tank Refill - 5000L',
-      amount: 7250.00,
-      payment_method: 'Bank Transfer',
-      receipt_number: 'FUEL-2024-023',
-      vendor: 'Petro Wholesale Corp',
-      created_at: '2024-11-05T08:30:00Z'
+  useEffect(() => {
+    loadExpenses()
+  }, [])
+
+  const loadExpenses = async () => {
+    try {
+      setLoading(true)
+      const expensesData = await getExpenses()
+      setExpenses(expensesData)
+    } catch (error) {
+      console.error('Error loading expenses:', error)
+    } finally {
+      setLoading(false)
     }
-  ]
+  }
 
-  const categories = [
-    'all', 'Utilities', 'Maintenance', 'Inventory', 'Insurance', 
-    'Fuel Purchase', 'Salaries', 'Marketing', 'Office Supplies', 'Other'
-  ]
+  // Get unique categories from expenses
+  const categories = ['all', ...Array.from(new Set(expenses.map(e => e.category)))]
 
   const paymentMethods = ['Cash', 'Credit Card', 'Bank Transfer', 'Check']
 
@@ -105,6 +68,14 @@ export default function ExpensesPage() {
     return expenses
       .filter(expense => expense.category === category)
       .reduce((total, expense) => total + expense.amount, 0)
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-lg">Loading expenses...</div>
+      </div>
+    )
   }
 
   const formatDate = (dateString: string) => {

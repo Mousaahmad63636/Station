@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -19,6 +19,7 @@ import {
   Receipt,
   Barcode
 } from 'lucide-react'
+import { getProducts, addSale, updateProductStock } from '@/lib/database'
 
 interface CartItem {
   id: string
@@ -33,15 +34,24 @@ export default function POSPage() {
   const [cart, setCart] = useState<CartItem[]>([])
   const [searchTerm, setSearchTerm] = useState('')
   const [paymentMethod, setPaymentMethod] = useState('cash')
+  const [products, setProducts] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
 
-  // Mock data - will be replaced with real data from Supabase
-  const products = [
-    { id: '1', name: 'Engine Oil 5W-30', price: 25.00, stock: 45, category: 'Oil & Lubricants' },
-    { id: '2', name: 'Brake Fluid DOT 4', price: 12.00, stock: 5, category: 'Fluids' },
-    { id: '3', name: 'Car Wash Premium', price: 15.00, stock: 100, category: 'Services' },
-    { id: '4', name: 'Air Freshener', price: 5.00, stock: 25, category: 'Accessories' },
-    { id: '5', name: 'Windshield Washer Fluid', price: 6.50, stock: 8, category: 'Fluids' },
-  ]
+  useEffect(() => {
+    loadProducts()
+  }, [])
+
+  const loadProducts = async () => {
+    try {
+      setLoading(true)
+      const productsData = await getProducts()
+      setProducts(productsData)
+    } catch (error) {
+      console.error('Error loading products:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
 
 
   const filteredProducts = products.filter(product =>
@@ -92,17 +102,44 @@ export default function POSPage() {
     return cart.reduce((total, item) => total + item.quantity, 0)
   }
 
-  const processPayment = () => {
-    // This will be replaced with actual payment processing and database updates
-    console.log('Processing payment:', {
-      cart,
-      total: getTotalAmount(),
-      paymentMethod
-    })
-    
-    // Clear cart after successful payment
-    setCart([])
-    alert('Payment processed successfully!')
+  const processPayment = async () => {
+    try {
+      // Process each item in the cart
+      for (const item of cart) {
+        // Record the sale
+        await addSale({
+          type: 'product',
+          pump_id: undefined,
+          product_id: item.id,
+          quantity: item.quantity,
+          unit_price: item.price,
+          total_amount: item.price * item.quantity,
+          payment_method: paymentMethod
+        })
+        
+        // Update product stock
+        const product = products.find(p => p.id === item.id)
+        if (product) {
+          await updateProductStock(item.id, product.current_stock - item.quantity)
+        }
+      }
+      
+      // Clear cart after successful payment
+      setCart([])
+      await loadProducts() // Refresh product data
+      alert(`Payment processed successfully! Total: $${getTotalAmount().toFixed(2)}`)
+    } catch (error) {
+      console.error('Error processing payment:', error)
+      alert('Error processing payment. Please try again.')
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-lg">Loading products...</div>
+      </div>
+    )
   }
 
   return (
@@ -139,17 +176,17 @@ export default function POSPage() {
                 <div key={product.id} className="border rounded-lg p-4">
                   <div className="flex justify-between items-start mb-2">
                     <h3 className="font-medium text-sm">{product.name}</h3>
-                    <Badge variant={product.stock > 10 ? 'default' : 'destructive'}>
-                      {product.stock}
+                    <Badge variant={product.current_stock > 10 ? 'default' : 'destructive'}>
+                      {product.current_stock}
                     </Badge>
                   </div>
-                  <p className="text-lg font-bold text-green-600">${product.price}</p>
+                  <p className="text-lg font-bold text-green-600">${product.sale_price}</p>
                   <p className="text-xs text-muted-foreground mb-3">{product.category}</p>
                   <Button
                     size="sm"
                     className="w-full"
-                    onClick={() => addToCart(product)}
-                    disabled={product.stock === 0}
+                    onClick={() => addToCart({...product, price: product.sale_price})}
+                    disabled={product.current_stock === 0}
                   >
                     <Plus className="mr-2 h-4 w-4" />
                     Add to Cart

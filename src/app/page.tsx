@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { 
@@ -10,32 +11,60 @@ import {
   AlertTriangle,
   Activity
 } from 'lucide-react'
+import { getDashboardStats, getRecentSales, getPumps, getProducts, getContainers } from '@/lib/database'
 
 export default function Dashboard() {
-  // Mock data - will be replaced with real data from Supabase
-  const stats = {
-    totalSales: 15420.50,
-    fuelSales: 12800.00,
-    productSales: 2620.50,
-    totalExpenses: 3200.00,
-    activePumps: 6,
-    totalPumps: 8,
-    lowStockItems: 3
+  const [stats, setStats] = useState({
+    totalSales: 0,
+    fuelSales: 0,
+    productSales: 0,
+    totalExpenses: 0,
+    netProfit: 0,
+    salesCount: 0
+  })
+  const [recentSales, setRecentSales] = useState<any[]>([])
+  const [pumps, setPumps] = useState<any[]>([])
+  const [products, setProducts] = useState<any[]>([])
+  const [containers, setContainers] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    loadDashboardData()
+  }, [])
+
+  const loadDashboardData = async () => {
+    try {
+      setLoading(true)
+      const [statsData, salesData, pumpsData, productsData, containersData] = await Promise.all([
+        getDashboardStats(),
+        getRecentSales(4),
+        getPumps(),
+        getProducts(),
+        getContainers()
+      ])
+      
+      setStats(statsData)
+      setRecentSales(salesData)
+      setPumps(pumpsData)
+      setProducts(productsData)
+      setContainers(containersData)
+    } catch (error) {
+      console.error('Error loading dashboard data:', error)
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const recentSales = [
-    { id: 1, type: 'Fuel', pump: 'Pump A', amount: 45.50, time: '10:30 AM', liters: 31.4 },
-    { id: 2, type: 'Product', item: 'Engine Oil 5W-30', amount: 25.00, time: '10:25 AM' },
-    { id: 3, type: 'Fuel', pump: 'Pump C', amount: 67.80, time: '10:20 AM', liters: 41.1 },
-    { id: 4, type: 'Product', item: 'Car Wash', amount: 15.00, time: '10:15 AM' },
-  ]
+  const lowStockProducts = products.filter(p => p.current_stock <= p.min_stock_level)
+  const activePumps = pumps.filter(p => p.is_active).length
 
-  const pumpStatus = [
-    { id: 'A', name: 'Pump A', status: 'active', counter: 4250, container: 'Tank 1' },
-    { id: 'B', name: 'Pump B', status: 'active', counter: 3890, container: 'Tank 1' },
-    { id: 'C', name: 'Pump C', status: 'active', counter: 5120, container: 'Tank 2' },
-    { id: 'D', name: 'Pump D', status: 'maintenance', counter: 2340, container: 'Tank 2' },
-  ]
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-lg">Loading dashboard...</div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -111,25 +140,28 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {pumpStatus.map((pump) => (
-                <div key={pump.id} className="flex items-center justify-between">
-                  <div className="flex items-center space-x-4">
-                    <div className="flex items-center space-x-2">
-                      <Activity className="h-4 w-4" />
-                      <span className="font-medium">{pump.name}</span>
+              {pumps.slice(0, 4).map((pump: any) => {
+                const container = containers.find(c => c.id === pump.container_id)
+                return (
+                  <div key={pump.id} className="flex items-center justify-between">
+                    <div className="flex items-center space-x-4">
+                      <div className="flex items-center space-x-2">
+                        <Activity className="h-4 w-4" />
+                        <span className="font-medium">{pump.name}</span>
+                      </div>
+                      <Badge 
+                        variant={pump.is_active ? 'default' : 'secondary'}
+                      >
+                        {pump.is_active ? 'active' : 'inactive'}
+                      </Badge>
                     </div>
-                    <Badge 
-                      variant={pump.status === 'active' ? 'default' : 'secondary'}
-                    >
-                      {pump.status}
-                    </Badge>
+                    <div className="text-right">
+                      <div className="text-sm font-medium">{pump.total_counter}L</div>
+                      <div className="text-xs text-muted-foreground">{container?.name}</div>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <div className="text-sm font-medium">{pump.counter}L</div>
-                    <div className="text-xs text-muted-foreground">{pump.container}</div>
-                  </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </CardContent>
         </Card>
@@ -141,15 +173,17 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {recentSales.map((sale) => (
+              {recentSales.map((sale: any) => (
                 <div key={sale.id} className="flex items-center justify-between">
                   <div>
                     <div className="text-sm font-medium">
-                      {sale.type === 'Fuel' ? sale.pump : sale.item}
+                      {sale.type === 'fuel' ? sale.pumps?.name : sale.products?.name}
                     </div>
-                    <div className="text-xs text-muted-foreground">{sale.time}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {new Date(sale.created_at).toLocaleTimeString()}
+                    </div>
                   </div>
-                  <div className="text-sm font-medium">${sale.amount}</div>
+                  <div className="text-sm font-medium">${sale.total_amount.toFixed(2)}</div>
                 </div>
               ))}
             </div>
@@ -158,18 +192,25 @@ export default function Dashboard() {
       </div>
 
       {/* Alerts */}
-      {stats.lowStockItems > 0 && (
+      {lowStockProducts.length > 0 && (
         <Card className="border-orange-200 bg-orange-50">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-orange-800">
               <AlertTriangle className="h-5 w-5" />
-              Low Stock Alert
+              Low Stock Alert ({lowStockProducts.length} items)
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-orange-700">
-              {stats.lowStockItems} items are running low on stock. Check inventory for details.
-            </p>
+            <div className="space-y-2">
+              {lowStockProducts.slice(0, 3).map((product: any) => (
+                <div key={product.id} className="flex justify-between items-center text-sm">
+                  <span className="text-orange-700">{product.name}</span>
+                  <span className="text-orange-600">
+                    {product.current_stock} left (min: {product.min_stock_level})
+                  </span>
+                </div>
+              ))}
+            </div>
           </CardContent>
         </Card>
       )}

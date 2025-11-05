@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -19,53 +19,84 @@ import {
   Calendar
 } from 'lucide-react'
 
+import { getContainers, getPumps, togglePumpStatus, resetDailyCounters, recordFuelSale, addPump } from '@/lib/database'
+
 export default function PumpsPage() {
   const [selectedPump, setSelectedPump] = useState<string | null>(null)
+  const [containers, setContainers] = useState<any[]>([])
+  const [pumps, setPumps] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
 
-  // Mock data - will be replaced with real data from Supabase
-  const containers = [
-    { id: '1', name: 'Tank 1', capacity: 10000, current_level: 7500, fuel_type: 'Regular' },
-    { id: '2', name: 'Tank 2', capacity: 8000, current_level: 6200, fuel_type: 'Premium' },
-    { id: '3', name: 'Tank 3', capacity: 5000, current_level: 3800, fuel_type: 'Diesel' },
-  ]
+  useEffect(() => {
+    loadData()
+  }, [])
 
-  const pumps = [
-    { id: '1', name: 'Pump A', container_id: '1', total_counter: 4250, daily_counter: 180, is_active: true, fuel_type: 'Regular' },
-    { id: '2', name: 'Pump B', container_id: '1', total_counter: 3890, daily_counter: 145, is_active: true, fuel_type: 'Regular' },
-    { id: '3', name: 'Pump C', container_id: '2', total_counter: 5120, daily_counter: 220, is_active: true, fuel_type: 'Premium' },
-    { id: '4', name: 'Pump D', container_id: '2', total_counter: 2340, daily_counter: 0, is_active: false, fuel_type: 'Premium' },
-    { id: '5', name: 'Pump E', container_id: '3', total_counter: 6780, daily_counter: 310, is_active: true, fuel_type: 'Diesel' },
-    { id: '6', name: 'Pump F', container_id: '3', total_counter: 4560, daily_counter: 195, is_active: true, fuel_type: 'Diesel' },
-  ]
+  const loadData = async () => {
+    try {
+      setLoading(true)
+      const [containersData, pumpsData] = await Promise.all([
+        getContainers(),
+        getPumps()
+      ])
+      setContainers(containersData)
+      setPumps(pumpsData)
+    } catch (error) {
+      console.error('Error loading pumps data:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const getContainer = (containerId: string) => {
     return containers.find(c => c.id === containerId)
   }
 
-  const togglePumpStatus = (pumpId: string) => {
-    // This will be replaced with actual API call
-    console.log(`Toggling pump ${pumpId}`)
+  const handleTogglePumpStatus = async (pumpId: string) => {
+    try {
+      const pump = pumps.find(p => p.id === pumpId)
+      if (pump) {
+        await togglePumpStatus(pumpId, !pump.is_active)
+        await loadData() // Refresh data
+      }
+    } catch (error) {
+      console.error('Error toggling pump status:', error)
+      alert('Error updating pump status')
+    }
   }
 
-  const recordCounterReading = (pumpId: string, newCounter: number, pricePerLiter: number) => {
-    // This will be replaced with actual API call to Supabase
-    const pump = pumps.find(p => p.id === pumpId)
-    if (pump) {
-      const fuelSold = newCounter - pump.total_counter
-      const revenue = fuelSold * pricePerLiter
-      
-      console.log(`Counter reading for ${pump.name}:`)
-      console.log(`- Previous counter: ${pump.total_counter}L`)
-      console.log(`- New counter: ${newCounter}L`)
-      console.log(`- Fuel sold: ${fuelSold}L`)
-      console.log(`- Revenue: $${revenue.toFixed(2)}`)
-      console.log(`- Deducting ${fuelSold}L from container ${pump.container_id}`)
-      
-      // Update pump counter and daily sales
-      // Reduce fuel from container
-      // Record sale transaction
-      alert(`Counter reading recorded! ${fuelSold}L sold for $${revenue.toFixed(2)}`)
+  const handleCounterReading = async (pumpId: string, newCounter: number, pricePerLiter: number) => {
+    try {
+      const pump = pumps.find(p => p.id === pumpId)
+      if (pump && newCounter > pump.total_counter) {
+        const result = await recordFuelSale(pumpId, pump.total_counter, newCounter, pricePerLiter)
+        alert(`Counter reading recorded! ${result.fuelSold}L sold for $${result.totalAmount.toFixed(2)}`)
+        await loadData() // Refresh data
+      } else {
+        alert('New counter reading must be greater than current counter')
+      }
+    } catch (error) {
+      console.error('Error recording counter reading:', error)
+      alert('Error recording counter reading')
     }
+  }
+
+  const handleResetDailyCounters = async () => {
+    try {
+      await resetDailyCounters()
+      await loadData() // Refresh data
+      alert('Daily counters reset for new day!')
+    } catch (error) {
+      console.error('Error resetting daily counters:', error)
+      alert('Error resetting daily counters')
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-lg">Loading pumps data...</div>
+      </div>
+    )
   }
 
   return (
@@ -78,11 +109,7 @@ export default function PumpsPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => {
-            // This will reset all daily counters to 0 for a new day
-            console.log('Resetting daily counters for new day')
-            alert('Daily counters reset for new day!')
-          }}>
+          <Button variant="outline" onClick={handleResetDailyCounters}>
             <Calendar className="mr-2 h-4 w-4" />
             New Day Reset
           </Button>
@@ -169,7 +196,7 @@ export default function PumpsPage() {
                   <Button
                     variant="ghost"
                     size="icon"
-                    onClick={() => togglePumpStatus(pump.id)}
+                    onClick={() => handleTogglePumpStatus(pump.id)}
                   >
                     {pump.is_active ? (
                       <Pause className="h-4 w-4" />

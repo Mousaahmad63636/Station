@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -21,55 +21,85 @@ import {
   FileText,
   Filter
 } from 'lucide-react'
+import { getDashboardStats, getSales, getExpenses, getPumps, getProducts } from '@/lib/database'
 
 export default function ReportsPage() {
   const [reportType, setReportType] = useState('daily')
   const [dateRange, setDateRange] = useState('today')
+  const [stats, setStats] = useState<any>({})
+  const [sales, setSales] = useState<any[]>([])
+  const [expenses, setExpenses] = useState<any[]>([])
+  const [pumps, setPumps] = useState<any[]>([])
+  const [products, setProducts] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
 
-  // Mock data - will be replaced with real data from Supabase
-  const dailyStats = {
-    date: '2024-11-05',
-    fuelSales: {
-      regular: { liters: 2450, revenue: 3557.50 },
-      premium: { liters: 1200, revenue: 1980.00 },
-      diesel: { liters: 800, revenue: 1240.00 }
-    },
-    productSales: {
-      count: 45,
-      revenue: 620.50
-    },
-    totalRevenue: 7398.00,
-    totalExpenses: 1200.00,
-    netProfit: 6198.00
+  useEffect(() => {
+    loadReportsData()
+  }, [])
+
+  const loadReportsData = async () => {
+    try {
+      setLoading(true)
+      const [statsData, salesData, expensesData, pumpsData, productsData] = await Promise.all([
+        getDashboardStats(),
+        getSales(100), // Get recent sales
+        getExpenses(),
+        getPumps(),
+        getProducts()
+      ])
+      
+      setStats(statsData)
+      setSales(salesData)
+      setExpenses(expensesData)
+      setPumps(pumpsData)
+      setProducts(productsData)
+    } catch (error) {
+      console.error('Error loading reports data:', error)
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const weeklyComparison = [
-    { date: '2024-10-29', sales: 6800.00, expenses: 1100.00, profit: 5700.00 },
-    { date: '2024-10-30', sales: 7200.00, expenses: 950.00, profit: 6250.00 },
-    { date: '2024-10-31', sales: 6900.00, expenses: 1300.00, profit: 5600.00 },
-    { date: '2024-11-01', sales: 7500.00, expenses: 1150.00, profit: 6350.00 },
-    { date: '2024-11-02', sales: 7100.00, expenses: 1000.00, profit: 6100.00 },
-    { date: '2024-11-03', sales: 7800.00, expenses: 1400.00, profit: 6400.00 },
-    { date: '2024-11-04', sales: 7300.00, expenses: 1250.00, profit: 6050.00 },
-    { date: '2024-11-05', sales: 7398.00, expenses: 1200.00, profit: 6198.00 },
-  ]
+  // Calculate analytics from real data
+  const today = new Date().toISOString().split('T')[0]
+  const todaySales = sales.filter(s => s.created_at.startsWith(today))
+  const todayExpenses = expenses.filter(e => e.created_at.startsWith(today))
+  
+  const fuelSales = todaySales.filter(s => s.type === 'fuel')
+  const productSales = todaySales.filter(s => s.type === 'product')
+  
+  // Get top products from sales data
+  const productSalesMap = new Map()
+  productSales.forEach(sale => {
+    const productId = sale.product_id
+    if (productSalesMap.has(productId)) {
+      const existing = productSalesMap.get(productId)
+      productSalesMap.set(productId, {
+        ...existing,
+        quantity: existing.quantity + sale.quantity,
+        revenue: existing.revenue + sale.total_amount
+      })
+    } else {
+      const product = products.find(p => p.id === productId)
+      productSalesMap.set(productId, {
+        name: product?.name || 'Unknown Product',
+        quantity: sale.quantity,
+        revenue: sale.total_amount
+      })
+    }
+  })
+  
+  const topProducts = Array.from(productSalesMap.values())
+    .sort((a, b) => b.revenue - a.revenue)
+    .slice(0, 5)
 
-  const topProducts = [
-    { name: 'Engine Oil 5W-30', sold: 25, revenue: 625.00 },
-    { name: 'Car Wash Premium', sold: 18, revenue: 270.00 },
-    { name: 'Air Freshener', sold: 15, revenue: 75.00 },
-    { name: 'Brake Fluid DOT 4', sold: 8, revenue: 96.00 },
-    { name: 'Windshield Washer Fluid', sold: 6, revenue: 39.00 }
-  ]
-
-  const pumpPerformance = [
-    { pump: 'Pump A', liters: 450, revenue: 652.50, transactions: 28 },
-    { pump: 'Pump B', liters: 380, revenue: 551.00, transactions: 24 },
-    { pump: 'Pump C', liters: 520, revenue: 858.00, transactions: 31 },
-    { pump: 'Pump D', liters: 0, revenue: 0, transactions: 0 },
-    { pump: 'Pump E', liters: 420, revenue: 651.00, transactions: 26 },
-    { pump: 'Pump F', liters: 350, revenue: 542.50, transactions: 22 }
-  ]
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-lg">Loading reports...</div>
+      </div>
+    )
+  }
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -134,9 +164,9 @@ export default function ReportsPage() {
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">${dailyStats.totalRevenue.toFixed(2)}</div>
+            <div className="text-2xl font-bold">${stats.totalSales?.toFixed(2) || '0.00'}</div>
             <div className="flex items-center gap-1 text-xs text-muted-foreground">
-              {getTrendIcon(dailyStats.totalRevenue, 7300)}
+              {getTrendIcon(stats.totalSales || 0, 7300)}
               <span>+1.3% from yesterday</span>
             </div>
           </CardContent>
@@ -149,10 +179,10 @@ export default function ReportsPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              ${(dailyStats.fuelSales.regular.revenue + dailyStats.fuelSales.premium.revenue + dailyStats.fuelSales.diesel.revenue).toFixed(2)}
+              ${stats.fuelSales?.toFixed(2) || '0.00'}
             </div>
             <div className="flex items-center gap-1 text-xs text-muted-foreground">
-              {getTrendIcon(6777.50, 6500)}
+              {getTrendIcon(stats.fuelSales || 0, 6500)}
               <span>+4.3% from yesterday</span>
             </div>
           </CardContent>
@@ -164,9 +194,9 @@ export default function ReportsPage() {
             <Package className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">${dailyStats.productSales.revenue.toFixed(2)}</div>
+            <div className="text-2xl font-bold">${stats.productSales?.toFixed(2) || '0.00'}</div>
             <div className="flex items-center gap-1 text-xs text-muted-foreground">
-              {getTrendIcon(620.50, 580)}
+              {getTrendIcon(stats.productSales || 0, 580)}
               <span>+7.0% from yesterday</span>
             </div>
           </CardContent>
@@ -178,9 +208,9 @@ export default function ReportsPage() {
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">${dailyStats.netProfit.toFixed(2)}</div>
+            <div className="text-2xl font-bold text-green-600">${stats.netProfit?.toFixed(2) || '0.00'}</div>
             <div className="flex items-center gap-1 text-xs text-muted-foreground">
-              {getTrendIcon(dailyStats.netProfit, 6050)}
+              {getTrendIcon(stats.netProfit || 0, 6050)}
               <span>+2.4% from yesterday</span>
             </div>
           </CardContent>
@@ -188,74 +218,72 @@ export default function ReportsPage() {
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
-        {/* Weekly Trend */}
+        {/* Today's Summary */}
         <Card>
           <CardHeader>
-            <CardTitle>Weekly Performance</CardTitle>
+            <CardTitle>Today's Performance</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {weeklyComparison.slice(-7).map((day, index) => (
-                <div key={day.date} className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                    <span className="text-sm font-medium">{formatDate(day.date)}</span>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-sm font-medium">${day.sales.toFixed(0)}</div>
-                    <div className="text-xs text-muted-foreground">
-                      Profit: ${day.profit.toFixed(0)}
-                    </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                  <span className="text-sm font-medium">Total Sales</span>
+                </div>
+                <div className="text-right">
+                  <div className="text-sm font-medium">${stats.totalSales?.toFixed(2) || '0.00'}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {sales.length} transactions
                   </div>
                 </div>
-              ))}
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                  <span className="text-sm font-medium">Expenses</span>
+                </div>
+                <div className="text-right">
+                  <div className="text-sm font-medium">${stats.totalExpenses?.toFixed(2) || '0.00'}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {expenses.length} items
+                  </div>
+                </div>
+              </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* Fuel Breakdown */}
+        {/* Fuel Types Summary */}
         <Card>
           <CardHeader>
-            <CardTitle>Fuel Sales Breakdown</CardTitle>
+            <CardTitle>Fuel Types</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-                  <span className="font-medium">Regular Gasoline</span>
-                </div>
-                <div className="text-right">
-                  <div className="font-medium">{dailyStats.fuelSales.regular.liters}L</div>
-                  <div className="text-sm text-muted-foreground">
-                    ${dailyStats.fuelSales.regular.revenue.toFixed(2)}
+              {Array.from(new Set(pumps.map(p => p.fuel_type))).map((fuelType, index) => {
+                const fuelTypeColor = ['bg-blue-500', 'bg-green-500', 'bg-yellow-500'][index] || 'bg-gray-500'
+                const fuelTypeSales = fuelSales.filter(s => {
+                  const pump = pumps.find(p => p.id === s.pump_id)
+                  return pump?.fuel_type === fuelType
+                })
+                const totalRevenue = fuelTypeSales.reduce((sum, s) => sum + s.total_amount, 0)
+                const totalLiters = fuelTypeSales.reduce((sum, s) => sum + s.quantity, 0)
+                
+                return (
+                  <div key={fuelType} className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-3 h-3 ${fuelTypeColor} rounded-full`}></div>
+                      <span className="font-medium">{fuelType}</span>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-medium">{totalLiters.toFixed(1)}L</div>
+                      <div className="text-sm text-muted-foreground">
+                        ${totalRevenue.toFixed(2)}
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                  <span className="font-medium">Premium Gasoline</span>
-                </div>
-                <div className="text-right">
-                  <div className="font-medium">{dailyStats.fuelSales.premium.liters}L</div>
-                  <div className="text-sm text-muted-foreground">
-                    ${dailyStats.fuelSales.premium.revenue.toFixed(2)}
-                  </div>
-                </div>
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
-                  <span className="font-medium">Diesel</span>
-                </div>
-                <div className="text-right">
-                  <div className="font-medium">{dailyStats.fuelSales.diesel.liters}L</div>
-                  <div className="text-sm text-muted-foreground">
-                    ${dailyStats.fuelSales.diesel.revenue.toFixed(2)}
-                  </div>
-                </div>
-              </div>
+                )
+              })}
             </div>
           </CardContent>
         </Card>
@@ -305,18 +333,24 @@ export default function ReportsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {pumpPerformance.map((pump) => (
-                  <TableRow key={pump.pump}>
-                    <TableCell className="font-medium">{pump.pump}</TableCell>
-                    <TableCell>{pump.liters}L</TableCell>
-                    <TableCell>${pump.revenue.toFixed(2)}</TableCell>
-                    <TableCell>
-                      <Badge variant={pump.liters > 0 ? 'default' : 'secondary'}>
-                        {pump.liters > 0 ? 'Active' : 'Inactive'}
-                      </Badge>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {pumps.map((pump: any) => {
+                  const pumpSales = fuelSales.filter(s => s.pump_id === pump.id)
+                  const totalLiters = pumpSales.reduce((sum, s) => sum + s.quantity, 0)
+                  const totalRevenue = pumpSales.reduce((sum, s) => sum + s.total_amount, 0)
+                  
+                  return (
+                    <TableRow key={pump.id}>
+                      <TableCell className="font-medium">{pump.name}</TableCell>
+                      <TableCell>{totalLiters.toFixed(1)}L</TableCell>
+                      <TableCell>${totalRevenue.toFixed(2)}</TableCell>
+                      <TableCell>
+                        <Badge variant={pump.is_active ? 'default' : 'secondary'}>
+                          {pump.is_active ? 'Active' : 'Inactive'}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
               </TableBody>
             </Table>
           </CardContent>

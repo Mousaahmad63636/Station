@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -18,66 +18,32 @@ import {
   Barcode,
   DollarSign
 } from 'lucide-react'
+import { getProducts, addProduct, updateProduct, updateProductStock } from '@/lib/database'
 
 export default function InventoryPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('all')
+  const [products, setProducts] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
 
-  // Mock data - will be replaced with real data from Supabase
-  const products = [
-    {
-      id: '1',
-      barcode: '1234567890123',
-      name: 'Engine Oil 5W-30',
-      category: 'Oil & Lubricants',
-      cost_price: 18.50,
-      sale_price: 25.00,
-      current_stock: 45,
-      min_stock_level: 10
-    },
-    {
-      id: '2',
-      barcode: '2345678901234',
-      name: 'Brake Fluid DOT 4',
-      category: 'Fluids',
-      cost_price: 8.00,
-      sale_price: 12.00,
-      current_stock: 5,
-      min_stock_level: 15
-    },
-    {
-      id: '3',
-      barcode: '3456789012345',
-      name: 'Car Wash Premium',
-      category: 'Services',
-      cost_price: 5.00,
-      sale_price: 15.00,
-      current_stock: 100,
-      min_stock_level: 20
-    },
-    {
-      id: '4',
-      barcode: '4567890123456',
-      name: 'Air Freshener',
-      category: 'Accessories',
-      cost_price: 2.50,
-      sale_price: 5.00,
-      current_stock: 25,
-      min_stock_level: 10
-    },
-    {
-      id: '5',
-      barcode: '5678901234567',
-      name: 'Windshield Washer Fluid',
-      category: 'Fluids',
-      cost_price: 3.00,
-      sale_price: 6.50,
-      current_stock: 8,
-      min_stock_level: 12
+  useEffect(() => {
+    loadProducts()
+  }, [])
+
+  const loadProducts = async () => {
+    try {
+      setLoading(true)
+      const productsData = await getProducts()
+      setProducts(productsData)
+    } catch (error) {
+      console.error('Error loading products:', error)
+    } finally {
+      setLoading(false)
     }
-  ]
+  }
 
-  const categories = ['all', 'Oil & Lubricants', 'Fluids', 'Services', 'Accessories']
+  // Get unique categories from products
+  const categories = ['all', ...Array.from(new Set(products.map(p => p.category)))]
 
   const filteredProducts = products.filter(product => {
     const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -87,6 +53,14 @@ export default function InventoryPage() {
   })
 
   const lowStockProducts = products.filter(product => product.current_stock <= product.min_stock_level)
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-lg">Loading inventory...</div>
+      </div>
+    )
+  }
 
   const getStockStatus = (current: number, min: number) => {
     if (current <= min) return 'low'
