@@ -311,6 +311,7 @@ export default function ExpensesPage() {
             </div>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       {/* Summary Cards */}
