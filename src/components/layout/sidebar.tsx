@@ -10,13 +10,15 @@ import {
   ShoppingCart,
   CreditCard,
   Home,
-  Receipt
+  Receipt,
+  Tag
 } from 'lucide-react'
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: Home },
   { name: 'Pumps', href: '/pumps', icon: Fuel },
   { name: 'Inventory', href: '/inventory', icon: Package },
+  { name: 'Categories', href: '/categories', icon: Tag },
   { name: 'POS', href: '/pos', icon: ShoppingCart },
   { name: 'Expenses', href: '/expenses', icon: CreditCard },
   { name: 'Reports', href: '/reports', icon: BarChart3 },

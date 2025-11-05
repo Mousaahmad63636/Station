@@ -1,6 +1,45 @@
 import { supabase } from './supabase'
 import { Container, Pump, Product, Sale, Expense, DailySummary } from './types'
 
+// Category functions
+export const getCategories = async () => {
+  const { data, error } = await supabase
+    .from('categories')
+    .select('*')
+    .order('name')
+  
+  if (error) throw error
+  return data || []
+}
+
+export const addCategory = async (category: { name: string; description?: string }) => {
+  const { data, error } = await supabase
+    .from('categories')
+    .insert([category])
+    .select()
+  
+  if (error) throw error
+  return data[0]
+}
+
+export const updateCategory = async (id: string, updates: { name?: string; description?: string }) => {
+  const { error } = await supabase
+    .from('categories')
+    .update(updates)
+    .eq('id', id)
+  
+  if (error) throw error
+}
+
+export const deleteCategory = async (id: string) => {
+  const { error } = await supabase
+    .from('categories')
+    .delete()
+    .eq('id', id)
+  
+  if (error) throw error
+}
+
 // Container functions
 export const getContainers = async (): Promise<Container[]> => {
   const { data, error } = await supabase

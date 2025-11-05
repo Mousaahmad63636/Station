@@ -18,32 +18,62 @@ import {
   Barcode,
   DollarSign
 } from 'lucide-react'
-import { getProducts, addProduct, updateProduct, updateProductStock } from '@/lib/database'
+import { getProducts, addProduct, updateProduct, updateProductStock, getCategories } from '@/lib/database'
 
 export default function InventoryPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('all')
   const [products, setProducts] = useState<any[]>([])
+  const [categories, setCategories] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [isQuickAddOpen, setIsQuickAddOpen] = useState(false)
 
   useEffect(() => {
-    loadProducts()
+    loadData()
   }, [])
 
-  const loadProducts = async () => {
+  const loadData = async () => {
     try {
       setLoading(true)
-      const productsData = await getProducts()
+      const [productsData, categoriesData] = await Promise.all([
+        getProducts(),
+        getCategories()
+      ])
       setProducts(productsData)
+      setCategories(categoriesData)
     } catch (error) {
-      console.error('Error loading products:', error)
+      console.error('Error loading data:', error)
     } finally {
       setLoading(false)
     }
   }
 
-  // Get unique categories from products
-  const categories = ['all', ...Array.from(new Set(products.map(p => p.category)))]
+  const handleQuickAdd = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    const formData = new FormData(event.currentTarget)
+    
+    try {
+      await addProduct({
+        barcode: formData.get('barcode') as string,
+        name: formData.get('name') as string,
+        category: formData.get('category') as string,
+        cost_price: parseFloat(formData.get('cost_price') as string),
+        sale_price: parseFloat(formData.get('sale_price') as string),
+        current_stock: parseInt(formData.get('current_stock') as string),
+        min_stock_level: parseInt(formData.get('min_stock_level') as string)
+      })
+      
+      setIsQuickAddOpen(false)
+      await loadData()
+      ;(event.target as HTMLFormElement).reset()
+    } catch (error) {
+      console.error('Error adding product:', error)
+      alert('Error adding product')
+    }
+  }
+
+  // Get all categories for filtering (from database + 'all' option)
+  const allCategories = ['all', ...categories.map(c => c.name)]
 
   const filteredProducts = products.filter(product => {
     const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -89,41 +119,41 @@ export default function InventoryPage() {
             Manage products, stock levels, and pricing
           </p>
         </div>
-        <Dialog>
+        <Dialog open={isQuickAddOpen} onOpenChange={setIsQuickAddOpen}>
           <DialogTrigger asChild>
             <Button>
               <Plus className="mr-2 h-4 w-4" />
-              Add Product
+              Quick Add Product
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-md">
             <DialogHeader>
-              <DialogTitle>Add New Product</DialogTitle>
+              <DialogTitle>Quick Add Product</DialogTitle>
             </DialogHeader>
-            <div className="space-y-4">
+            <form onSubmit={handleQuickAdd} className="space-y-4">
               <div>
-                <Label htmlFor="barcode">Barcode</Label>
+                <Label htmlFor="quick-barcode">Barcode</Label>
                 <div className="flex gap-2">
-                  <Input id="barcode" placeholder="Scan or enter barcode" />
-                  <Button variant="outline" size="icon">
+                  <Input id="quick-barcode" name="barcode" placeholder="Scan or enter barcode" required />
+                  <Button type="button" variant="outline" size="icon">
                     <Barcode className="h-4 w-4" />
                   </Button>
                 </div>
               </div>
               <div>
-                <Label htmlFor="product-name">Product Name</Label>
-                <Input id="product-name" placeholder="Enter product name" />
+                <Label htmlFor="quick-name">Product Name</Label>
+                <Input id="quick-name" name="name" placeholder="Enter product name" required />
               </div>
               <div>
-                <Label htmlFor="category">Category</Label>
-                <Select>
+                <Label htmlFor="quick-category">Category</Label>
+                <Select name="category" required>
                   <SelectTrigger>
                     <SelectValue placeholder="Select category" />
                   </SelectTrigger>
                   <SelectContent>
-                    {categories.slice(1).map((category) => (
-                      <SelectItem key={category} value={category}>
-                        {category}
+                    {categories.map((category) => (
+                      <SelectItem key={category.id} value={category.name}>
+                        {category.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -131,26 +161,26 @@ export default function InventoryPage() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="cost-price">Cost Price</Label>
-                  <Input id="cost-price" type="number" placeholder="0.00" />
+                  <Label htmlFor="quick-cost-price">Cost Price</Label>
+                  <Input id="quick-cost-price" name="cost_price" type="number" step="0.01" placeholder="0.00" required />
                 </div>
                 <div>
-                  <Label htmlFor="sale-price">Sale Price</Label>
-                  <Input id="sale-price" type="number" placeholder="0.00" />
+                  <Label htmlFor="quick-sale-price">Sale Price</Label>
+                  <Input id="quick-sale-price" name="sale_price" type="number" step="0.01" placeholder="0.00" required />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="current-stock">Current Stock</Label>
-                  <Input id="current-stock" type="number" placeholder="0" />
+                  <Label htmlFor="quick-current-stock">Current Stock</Label>
+                  <Input id="quick-current-stock" name="current_stock" type="number" placeholder="0" required />
                 </div>
                 <div>
-                  <Label htmlFor="min-stock">Min Stock Level</Label>
-                  <Input id="min-stock" type="number" placeholder="0" />
+                  <Label htmlFor="quick-min-stock">Min Stock Level</Label>
+                  <Input id="quick-min-stock" name="min_stock_level" type="number" placeholder="0" required />
                 </div>
               </div>
-              <Button className="w-full">Add Product</Button>
-            </div>
+              <Button type="submit" className="w-full">Add Product</Button>
+            </form>
           </DialogContent>
         </Dialog>
       </div>
@@ -166,7 +196,7 @@ export default function InventoryPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
-              {lowStockProducts.map((product) => (
+              {lowStockProducts.slice(0, 3).map((product) => (
                 <div key={product.id} className="flex justify-between items-center text-sm">
                   <span className="text-orange-700">{product.name}</span>
                   <span className="text-orange-600">
@@ -195,7 +225,7 @@ export default function InventoryPage() {
             <SelectValue placeholder="Filter by category" />
           </SelectTrigger>
           <SelectContent>
-            {categories.map((category) => (
+            {allCategories.map((category) => (
               <SelectItem key={category} value={category}>
                 {category === 'all' ? 'All Categories' : category}
               </SelectItem>
