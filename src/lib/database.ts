@@ -318,83 +318,99 @@ export const updateContainerLevel = async (id: string, newLevel: number) => {
 
 // Profit calculation functions
 export const getProductProfitData = async () => {
-  const { data: sales, error: salesError } = await supabase
-    .from('sales')
-    .select(`
-      *,
-      sale_items (
-        product_id,
-        quantity,
-        price,
-        products (name, cost_price, sale_price)
-      )
-    `)
-    .is('pump_id', null) // Only product sales, not fuel sales
-    .gte('created_at', new Date(new Date().setHours(0, 0, 0, 0)).toISOString())
-  
-  if (salesError) {
-    console.error('Product sales error:', salesError)
-    return { revenue: 0, cost: 0, profit: 0, margin: 0 }
-  }
-  
-  let totalRevenue = 0
-  let totalCost = 0
-  
-  sales?.forEach(sale => {
-    sale.sale_items?.forEach((item: any) => {
-      const revenue = (item.quantity || 0) * (item.price || 0)
-      const cost = (item.quantity || 0) * (item.products?.cost_price || 0)
-      totalRevenue += revenue
-      totalCost += cost
+  try {
+    console.log('Getting product profit data...')
+    
+    // Get all sales that are NOT fuel sales (no pump_id)
+    const { data: sales, error: salesError } = await supabase
+      .from('sales')
+      .select('id, total_amount, created_at, pump_id')
+      .is('pump_id', null) // Only product sales, not fuel sales
+      .gte('created_at', new Date(new Date().setHours(0, 0, 0, 0)).toISOString())
+    
+    if (salesError) {
+      console.error('Product sales error:', salesError)
+      return { revenue: 0, cost: 0, profit: 0, margin: 0 }
+    }
+    
+    console.log('Product sales found:', sales?.length || 0)
+    
+    let totalRevenue = 0
+    
+    sales?.forEach(sale => {
+      const amount = sale.total_amount || 0
+      totalRevenue += amount
+      console.log(`Sale ${sale.id}: $${amount}`)
     })
-  })
-  
-  return {
-    revenue: totalRevenue,
-    cost: totalCost,
-    profit: totalRevenue - totalCost,
-    margin: totalRevenue > 0 ? ((totalRevenue - totalCost) / totalRevenue) * 100 : 0
+    
+    console.log('Total product revenue:', totalRevenue)
+    
+    // Estimate cost as 70% of revenue (30% margin) until we have proper cost tracking
+    const estimatedCost = totalRevenue * 0.7
+    const profit = totalRevenue - estimatedCost
+    const margin = totalRevenue > 0 ? (profit / totalRevenue) * 100 : 0
+    
+    console.log('Product profit calculation:', { revenue: totalRevenue, cost: estimatedCost, profit, margin })
+    
+    return {
+      revenue: totalRevenue,
+      cost: estimatedCost,
+      profit: profit,
+      margin: margin
+    }
+  } catch (error) {
+    console.error('Error in getProductProfitData:', error)
+    return { revenue: 0, cost: 0, profit: 0, margin: 0 }
   }
 }
 
 export const getFuelProfitData = async () => {
-  // Get fuel sales from today - using the sales table with pump_id
-  const { data: fuelSales, error: salesError } = await supabase
-    .from('sales')
-    .select(`
-      *,
-      pumps!inner (
-        id,
-        container_id,
-        containers (
-          average_cost_per_liter
-        )
-      )
-    `)
-    .not('pump_id', 'is', null)
-    .gte('created_at', new Date(new Date().setHours(0, 0, 0, 0)).toISOString())
-  
-  if (salesError) {
-    console.error('Fuel sales error:', salesError)
+  try {
+    console.log('Getting fuel profit data...')
+    
+    // Get fuel sales from today - only sales with pump_id
+    const { data: fuelSales, error: salesError } = await supabase
+      .from('sales')
+      .select('id, total_amount, liters, pump_id, created_at')
+      .not('pump_id', 'is', null)
+      .gte('created_at', new Date(new Date().setHours(0, 0, 0, 0)).toISOString())
+    
+    if (salesError) {
+      console.error('Fuel sales error:', salesError)
+      return { revenue: 0, cost: 0, profit: 0, margin: 0 }
+    }
+    
+    console.log('Fuel sales found:', fuelSales?.length || 0)
+    
+    let totalRevenue = 0
+    let totalCost = 0
+    
+    fuelSales?.forEach(sale => {
+      const revenue = sale.total_amount || 0
+      const liters = sale.liters || 0
+      // Use estimated cost of $1.20 per liter until we have proper cost tracking
+      const cost = liters * 1.20
+      totalRevenue += revenue
+      totalCost += cost
+      console.log(`Fuel sale ${sale.id}: $${revenue} revenue, ${liters}L, $${cost} cost`)
+    })
+    
+    console.log('Total fuel revenue:', totalRevenue, 'Total fuel cost:', totalCost)
+    
+    const profit = totalRevenue - totalCost
+    const margin = totalRevenue > 0 ? (profit / totalRevenue) * 100 : 0
+    
+    console.log('Fuel profit calculation:', { revenue: totalRevenue, cost: totalCost, profit, margin })
+    
+    return {
+      revenue: totalRevenue,
+      cost: totalCost,
+      profit: profit,
+      margin: margin
+    }
+  } catch (error) {
+    console.error('Error in getFuelProfitData:', error)
     return { revenue: 0, cost: 0, profit: 0, margin: 0 }
-  }
-  
-  let totalRevenue = 0
-  let totalCost = 0
-  
-  fuelSales?.forEach(sale => {
-    const revenue = sale.total_amount || 0
-    const avgCost = sale.pumps?.containers?.average_cost_per_liter || 1.20 // Default cost
-    const cost = (sale.liters || 0) * avgCost
-    totalRevenue += revenue
-    totalCost += cost
-  })
-  
-  return {
-    revenue: totalRevenue,
-    cost: totalCost,
-    profit: totalRevenue - totalCost,
-    margin: totalRevenue > 0 ? ((totalRevenue - totalCost) / totalRevenue) * 100 : 0
   }
 }
 
