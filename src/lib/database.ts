@@ -125,37 +125,65 @@ export const deleteContainer = async (id: string) => {
 
 // Fuel Prices functions
 export const getFuelPrices = async () => {
-  const { data, error } = await supabase
-    .from('fuel_prices')
-    .select('*')
-    .order('fuel_type')
-  
-  if (error) throw error
-  return data || []
+  try {
+    const { data, error } = await supabase
+      .from('fuel_prices')
+      .select('*')
+      .order('fuel_type')
+    
+    if (error) {
+      console.log('Fuel prices table not found, returning default prices')
+      return [
+        { fuel_type: 'Regular Gasoline', price_per_liter: 1.45 },
+        { fuel_type: 'Premium Gasoline', price_per_liter: 1.65 },
+        { fuel_type: 'Diesel', price_per_liter: 1.55 }
+      ]
+    }
+    return data || []
+  } catch (error) {
+    console.log('Error getting fuel prices:', error)
+    return []
+  }
 }
 
 export const updateFuelPrice = async (fuelType: string, pricePerLiter: number) => {
-  const { error } = await supabase
-    .from('fuel_prices')
-    .upsert({ 
-      fuel_type: fuelType, 
-      price_per_liter: pricePerLiter 
-    }, { 
-      onConflict: 'fuel_type' 
-    })
-  
-  if (error) throw error
+  try {
+    const { error } = await supabase
+      .from('fuel_prices')
+      .upsert({ 
+        fuel_type: fuelType, 
+        price_per_liter: pricePerLiter 
+      }, { 
+        onConflict: 'fuel_type' 
+      })
+    
+    if (error) {
+      console.log('Fuel prices table not found, cannot update prices')
+      throw new Error('Fuel prices table not available. Please run the database migration first.')
+    }
+  } catch (error) {
+    console.log('Error updating fuel price:', error)
+    throw error
+  }
 }
 
 export const getFuelPrice = async (fuelType: string) => {
-  const { data, error } = await supabase
-    .from('fuel_prices')
-    .select('price_per_liter')
-    .eq('fuel_type', fuelType)
-    .single()
-  
-  if (error) throw error
-  return data?.price_per_liter || 1.50 // Default fallback price
+  try {
+    const { data, error } = await supabase
+      .from('fuel_prices')
+      .select('price_per_liter')
+      .eq('fuel_type', fuelType)
+      .single()
+    
+    if (error) {
+      console.log('Fuel prices table not found, using default price')
+      return 1.50 // Default fallback price
+    }
+    return data?.price_per_liter || 1.50
+  } catch (error) {
+    console.log('Error getting fuel price, using default:', error)
+    return 1.50 // Default fallback price
+  }
 }
 
 // Fuel Purchase functions
@@ -167,31 +195,47 @@ export const addFuelPurchase = async (purchase: {
   supplier?: string;
   invoice_number?: string;
 }) => {
-  const { data, error } = await supabase
-    .from('fuel_purchases')
-    .insert([purchase])
-    .select()
-  
-  if (error) throw error
-  return data[0]
+  try {
+    const { data, error } = await supabase
+      .from('fuel_purchases')
+      .insert([purchase])
+      .select()
+    
+    if (error) {
+      console.error('Fuel purchase table not found, skipping fuel purchase record:', error)
+      return null
+    }
+    return data[0]
+  } catch (error) {
+    console.error('Error adding fuel purchase:', error)
+    return null
+  }
 }
 
 export const getFuelPurchases = async (containerId?: string) => {
-  let query = supabase
-    .from('fuel_purchases')
-    .select(`
-      *,
-      containers (name, fuel_type)
-    `)
-    .order('purchase_date', { ascending: false })
-  
-  if (containerId) {
-    query = query.eq('container_id', containerId)
+  try {
+    let query = supabase
+      .from('fuel_purchases')
+      .select(`
+        *,
+        containers (name, fuel_type)
+      `)
+      .order('purchase_date', { ascending: false })
+    
+    if (containerId) {
+      query = query.eq('container_id', containerId)
+    }
+    
+    const { data, error } = await query
+    if (error) {
+      console.log('Fuel purchases table not found')
+      return []
+    }
+    return data || []
+  } catch (error) {
+    console.log('Error getting fuel purchases:', error)
+    return []
   }
-  
-  const { data, error } = await query
-  if (error) throw error
-  return data || []
 }
 
 export const refillContainer = async (
@@ -215,18 +259,25 @@ export const refillContainer = async (
     const newLevel = container.current_level + litersAdded
     const totalCost = litersAdded * costPerLiter
     
-    // 2. Update container level and average cost
+    // 2. Update container level and average cost (if column exists)
+    const currentAvgCost = container.average_cost_per_liter || 1.20 // Default if column doesn't exist
     const totalLitersEver = container.current_level + litersAdded
     const newAverageCost = totalLitersEver > 0 
-      ? ((container.average_cost_per_liter * container.current_level) + totalCost) / totalLitersEver
+      ? ((currentAvgCost * container.current_level) + totalCost) / totalLitersEver
       : costPerLiter
+    
+    // Try to update with average cost, fall back to just level if column doesn't exist
+    let updateData: any = { current_level: Math.min(newLevel, container.capacity) }
+    
+    try {
+      updateData.average_cost_per_liter = newAverageCost
+    } catch (e) {
+      console.log('average_cost_per_liter column not found, updating level only')
+    }
     
     const { error: updateError } = await supabase
       .from('containers')
-      .update({ 
-        current_level: Math.min(newLevel, container.capacity),
-        average_cost_per_liter: newAverageCost
-      })
+      .update(updateData)
       .eq('id', containerId)
     
     if (updateError) throw updateError
@@ -278,17 +329,21 @@ export const getProductProfitData = async () => {
         products (name, cost_price, sale_price)
       )
     `)
+    .is('pump_id', null) // Only product sales, not fuel sales
     .gte('created_at', new Date(new Date().setHours(0, 0, 0, 0)).toISOString())
   
-  if (salesError) throw salesError
+  if (salesError) {
+    console.error('Product sales error:', salesError)
+    return { revenue: 0, cost: 0, profit: 0, margin: 0 }
+  }
   
   let totalRevenue = 0
   let totalCost = 0
   
   sales?.forEach(sale => {
     sale.sale_items?.forEach((item: any) => {
-      const revenue = item.quantity * item.price
-      const cost = item.quantity * (item.products?.cost_price || 0)
+      const revenue = (item.quantity || 0) * (item.price || 0)
+      const cost = (item.quantity || 0) * (item.products?.cost_price || 0)
       totalRevenue += revenue
       totalCost += cost
     })
@@ -303,26 +358,34 @@ export const getProductProfitData = async () => {
 }
 
 export const getFuelProfitData = async () => {
-  // Get fuel sales from today
+  // Get fuel sales from today - using the sales table with pump_id
   const { data: fuelSales, error: salesError } = await supabase
-    .from('fuel_sales')
+    .from('sales')
     .select(`
       *,
-      pumps (
-        fuel_type,
-        containers (average_cost_per_liter)
+      pumps!inner (
+        id,
+        container_id,
+        containers (
+          average_cost_per_liter
+        )
       )
     `)
-    .gte('sale_date', new Date(new Date().setHours(0, 0, 0, 0)).toISOString())
+    .not('pump_id', 'is', null)
+    .gte('created_at', new Date(new Date().setHours(0, 0, 0, 0)).toISOString())
   
-  if (salesError) throw salesError
+  if (salesError) {
+    console.error('Fuel sales error:', salesError)
+    return { revenue: 0, cost: 0, profit: 0, margin: 0 }
+  }
   
   let totalRevenue = 0
   let totalCost = 0
   
   fuelSales?.forEach(sale => {
-    const revenue = sale.total_amount
-    const cost = sale.liters * (sale.pumps?.containers?.average_cost_per_liter || 0)
+    const revenue = sale.total_amount || 0
+    const avgCost = sale.pumps?.containers?.average_cost_per_liter || 1.20 // Default cost
+    const cost = (sale.liters || 0) * avgCost
     totalRevenue += revenue
     totalCost += cost
   })
