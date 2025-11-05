@@ -34,6 +34,8 @@ export default function PumpsPage() {
   const [editingContainer, setEditingContainer] = useState<any>(null)
   const [isEditContainerOpen, setIsEditContainerOpen] = useState(false)
   const [isAddPumpOpen, setIsAddPumpOpen] = useState(false)
+  const [isCounterReadingOpen, setIsCounterReadingOpen] = useState(false)
+  const [selectedPumpForReading, setSelectedPumpForReading] = useState<any>(null)
 
   useEffect(() => {
     loadData()
@@ -72,16 +74,28 @@ export default function PumpsPage() {
     }
   }
 
-  const handleCounterReading = async (pumpId: string, newCounter: number, pricePerLiter: number) => {
+  const handleCounterReading = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!selectedPumpForReading) return
+    
+    const formData = new FormData(event.currentTarget)
+    const newCounter = parseFloat(formData.get('new_counter') as string)
+    const fuelPrice = parseFloat(formData.get('fuel_price') as string)
+    
+    if (newCounter <= selectedPumpForReading.total_counter) {
+      alert('New counter reading must be greater than current counter')
+      return
+    }
+    
     try {
-      const pump = pumps.find(p => p.id === pumpId)
-      if (pump && newCounter > pump.total_counter) {
-        const result = await recordFuelSale(pumpId, pump.total_counter, newCounter, pricePerLiter)
-        alert(`Counter reading recorded! ${result.fuelSold}L sold for $${result.totalAmount.toFixed(2)}`)
-        await loadData() // Refresh data
-      } else {
-        alert('New counter reading must be greater than current counter')
-      }
+      const fuelSold = newCounter - selectedPumpForReading.total_counter
+      const result = await recordFuelSale(selectedPumpForReading.id, selectedPumpForReading.total_counter, newCounter, fuelPrice)
+      
+      alert(`Counter reading recorded! ${fuelSold}L sold for $${(fuelSold * fuelPrice).toFixed(2)}`)
+      setIsCounterReadingOpen(false)
+      setSelectedPumpForReading(null)
+      await loadData()
+      ;(event.target as HTMLFormElement).reset()
     } catch (error) {
       console.error('Error recording counter reading:', error)
       alert('Error recording counter reading')
@@ -189,6 +203,11 @@ export default function PumpsPage() {
       console.error('Error adding pump:', error)
       alert('Error adding pump')
     }
+  }
+
+  const openCounterReading = (pump: any) => {
+    setSelectedPumpForReading(pump)
+    setIsCounterReadingOpen(true)
   }
 
   if (loading) {
@@ -500,55 +519,15 @@ export default function PumpsPage() {
                 </div>
 
                 <div className="flex gap-2">
-                  <Dialog>
-                    <DialogTrigger asChild>
-                      <Button variant="outline" size="sm" className="flex-1">
-                        <Plus className="mr-2 h-4 w-4" />
-                        Read Counter
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>End-of-Day Counter Reading - {pump.name}</DialogTitle>
-                      </DialogHeader>
-                      <div className="space-y-4">
-                        <div className="bg-gray-50 p-3 rounded">
-                          <p className="text-sm text-muted-foreground">Current Counter</p>
-                          <p className="text-2xl font-bold">{pump.total_counter}L</p>
-                        </div>
-                        <div>
-                          <Label htmlFor="new-counter">New Counter Reading</Label>
-                          <Input 
-                            id="new-counter" 
-                            type="number" 
-                            placeholder="Enter new counter reading"
-                            min={pump.total_counter}
-                          />
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Must be greater than current counter ({pump.total_counter}L)
-                          </p>
-                        </div>
-                        <div>
-                          <Label htmlFor="fuel-price">Fuel Price per Liter</Label>
-                          <Input 
-                            id="fuel-price" 
-                            type="number" 
-                            placeholder="1.45" 
-                            step="0.01"
-                          />
-                        </div>
-                        <div className="bg-blue-50 p-3 rounded">
-                          <p className="text-sm text-blue-600">
-                            <strong>How it works:</strong> New counter - Current counter = Fuel sold today
-                          </p>
-                          <p className="text-xs text-blue-500 mt-1">
-                            This amount will be deducted from {container?.name} and recorded as today's sale
-                          </p>
-                        </div>
-                        <Button className="w-full">Record Counter Reading</Button>
-                      </div>
-                    </DialogContent>
-                  </Dialog>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="flex-1"
+                    onClick={() => openCounterReading(pump)}
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    Read Counter
+                  </Button>
                   
                   <Button variant="outline" size="sm">
                     <BarChart3 className="h-4 w-4" />
@@ -622,6 +601,64 @@ export default function PumpsPage() {
                 Cancel
               </Button>
               <Button type="submit" className="flex-1">Update Container</Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Counter Reading Dialog */}
+      <Dialog open={isCounterReadingOpen} onOpenChange={setIsCounterReadingOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>End-of-Day Counter Reading - {selectedPumpForReading?.name}</DialogTitle>
+            <p className="text-sm text-muted-foreground">Record new counter reading and fuel price</p>
+          </DialogHeader>
+          <form onSubmit={handleCounterReading} className="space-y-4 mt-4">
+            <div className="bg-gray-50 p-3 rounded">
+              <p className="text-sm text-muted-foreground">Current Counter</p>
+              <p className="text-2xl font-bold">{selectedPumpForReading?.total_counter}L</p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="new-counter">New Counter Reading *</Label>
+              <Input 
+                id="new-counter" 
+                name="new_counter"
+                type="number" 
+                step="0.01"
+                placeholder="Enter new counter reading"
+                min={selectedPumpForReading?.total_counter || 0}
+                required
+                className="focus:ring-2 focus:ring-blue-500"
+              />
+              <p className="text-xs text-muted-foreground">
+                Must be greater than current counter ({selectedPumpForReading?.total_counter}L)
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="fuel-price">Fuel Price per Liter *</Label>
+              <Input 
+                id="fuel-price" 
+                name="fuel_price"
+                type="number" 
+                step="0.01"
+                placeholder="1.45" 
+                required
+                className="focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div className="bg-blue-50 p-3 rounded">
+              <p className="text-sm text-blue-600">
+                <strong>How it works:</strong> New counter - Current counter = Fuel sold today
+              </p>
+              <p className="text-xs text-blue-500 mt-1">
+                This amount will be deducted from the container and recorded as today's sale
+              </p>
+            </div>
+            <div className="flex gap-2 pt-2">
+              <Button type="button" variant="outline" className="flex-1" onClick={() => setIsCounterReadingOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" className="flex-1">Record Counter Reading</Button>
             </div>
           </form>
         </DialogContent>
