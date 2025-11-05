@@ -22,7 +22,7 @@ import {
   Database
 } from 'lucide-react'
 
-import { getContainers, getPumps, togglePumpStatus, resetDailyCounters, recordFuelSale, addPump, addContainer, updateContainer, deleteContainer } from '@/lib/database'
+import { getContainers, getPumps, togglePumpStatus, resetDailyCounters, recordFuelSale, addPump, addContainer, updateContainer, deleteContainer, getFuelPrice } from '@/lib/database'
 
 export default function PumpsPage() {
   const [selectedPump, setSelectedPump] = useState<string | null>(null)
@@ -36,6 +36,7 @@ export default function PumpsPage() {
   const [isAddPumpOpen, setIsAddPumpOpen] = useState(false)
   const [isCounterReadingOpen, setIsCounterReadingOpen] = useState(false)
   const [selectedPumpForReading, setSelectedPumpForReading] = useState<any>(null)
+  const [defaultFuelPrice, setDefaultFuelPrice] = useState<number>(1.50)
 
   useEffect(() => {
     loadData()
@@ -205,9 +206,19 @@ export default function PumpsPage() {
     }
   }
 
-  const openCounterReading = (pump: any) => {
-    setSelectedPumpForReading(pump)
-    setIsCounterReadingOpen(true)
+  const openCounterReading = async (pump: any) => {
+    try {
+      setSelectedPumpForReading(pump)
+      // Load the saved fuel price for this pump's fuel type
+      const savedPrice = await getFuelPrice(pump.fuel_type)
+      setDefaultFuelPrice(savedPrice)
+      setIsCounterReadingOpen(true)
+    } catch (error) {
+      console.error('Error loading fuel price:', error)
+      setSelectedPumpForReading(pump)
+      setDefaultFuelPrice(1.50) // Fallback price
+      setIsCounterReadingOpen(true)
+    }
   }
 
   if (loading) {
@@ -641,10 +652,14 @@ export default function PumpsPage() {
                 name="fuel_price"
                 type="number" 
                 step="0.01"
+                defaultValue={defaultFuelPrice}
                 placeholder="1.45" 
                 required
                 className="focus:ring-2 focus:ring-blue-500"
               />
+              <p className="text-xs text-muted-foreground">
+                Default price loaded from settings. You can change it if needed.
+              </p>
             </div>
             <div className="bg-blue-50 p-3 rounded">
               <p className="text-sm text-blue-600">

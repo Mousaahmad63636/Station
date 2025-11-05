@@ -123,6 +123,41 @@ export const deleteContainer = async (id: string) => {
   if (error) throw error
 }
 
+// Fuel Prices functions
+export const getFuelPrices = async () => {
+  const { data, error } = await supabase
+    .from('fuel_prices')
+    .select('*')
+    .order('fuel_type')
+  
+  if (error) throw error
+  return data || []
+}
+
+export const updateFuelPrice = async (fuelType: string, pricePerLiter: number) => {
+  const { error } = await supabase
+    .from('fuel_prices')
+    .upsert({ 
+      fuel_type: fuelType, 
+      price_per_liter: pricePerLiter 
+    }, { 
+      onConflict: 'fuel_type' 
+    })
+  
+  if (error) throw error
+}
+
+export const getFuelPrice = async (fuelType: string) => {
+  const { data, error } = await supabase
+    .from('fuel_prices')
+    .select('price_per_liter')
+    .eq('fuel_type', fuelType)
+    .single()
+  
+  if (error) throw error
+  return data?.price_per_liter || 1.50 // Default fallback price
+}
+
 export const updateContainerLevel = async (id: string, newLevel: number) => {
   const { error } = await supabase
     .from('containers')

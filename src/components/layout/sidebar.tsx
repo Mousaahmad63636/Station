@@ -11,7 +11,8 @@ import {
   CreditCard,
   Home,
   Receipt,
-  Tag
+  Tag,
+  Settings
 } from 'lucide-react'
 
 const navigation = [
@@ -22,6 +23,7 @@ const navigation = [
   { name: 'POS', href: '/pos', icon: ShoppingCart },
   { name: 'Expenses', href: '/expenses', icon: CreditCard },
   { name: 'Reports', href: '/reports', icon: BarChart3 },
+  { name: 'Settings', href: '/settings', icon: Settings },
 ]
 
 export function Sidebar() {
