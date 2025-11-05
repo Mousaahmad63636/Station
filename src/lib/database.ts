@@ -40,6 +40,45 @@ export const deleteCategory = async (id: string) => {
   if (error) throw error
 }
 
+// Expense Category functions
+export const getExpenseCategories = async () => {
+  const { data, error } = await supabase
+    .from('expense_categories')
+    .select('*')
+    .order('name')
+  
+  if (error) throw error
+  return data || []
+}
+
+export const addExpenseCategory = async (category: { name: string; description?: string }) => {
+  const { data, error } = await supabase
+    .from('expense_categories')
+    .insert([category])
+    .select()
+  
+  if (error) throw error
+  return data[0]
+}
+
+export const updateExpenseCategory = async (id: string, updates: { name?: string; description?: string }) => {
+  const { error } = await supabase
+    .from('expense_categories')
+    .update(updates)
+    .eq('id', id)
+  
+  if (error) throw error
+}
+
+export const deleteExpenseCategory = async (id: string) => {
+  const { error } = await supabase
+    .from('expense_categories')
+    .delete()
+    .eq('id', id)
+  
+  if (error) throw error
+}
+
 // Container functions
 export const getContainers = async (): Promise<Container[]> => {
   const { data, error } = await supabase

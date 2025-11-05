@@ -21,33 +21,99 @@ import {
   Calendar,
   Filter
 } from 'lucide-react'
-import { getExpenses, addExpense, updateExpense, deleteExpense } from '@/lib/database'
+import { getExpenses, addExpense, updateExpense, deleteExpense, getExpenseCategories, addExpenseCategory, updateExpenseCategory, deleteExpenseCategory } from '@/lib/database'
 
 export default function ExpensesPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('all')
   const [selectedMonth, setSelectedMonth] = useState('all')
   const [expenses, setExpenses] = useState<any[]>([])
+  const [expenseCategories, setExpenseCategories] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [isCategoryManagerOpen, setIsCategoryManagerOpen] = useState(false)
+  const [editingCategory, setEditingCategory] = useState<any>(null)
+  const [isAddCategoryOpen, setIsAddCategoryOpen] = useState(false)
+  const [isEditCategoryOpen, setIsEditCategoryOpen] = useState(false)
 
   useEffect(() => {
-    loadExpenses()
+    loadData()
   }, [])
 
-  const loadExpenses = async () => {
+  const loadData = async () => {
     try {
       setLoading(true)
-      const expensesData = await getExpenses()
+      const [expensesData, categoriesData] = await Promise.all([
+        getExpenses(),
+        getExpenseCategories()
+      ])
       setExpenses(expensesData)
+      setExpenseCategories(categoriesData)
     } catch (error) {
-      console.error('Error loading expenses:', error)
+      console.error('Error loading data:', error)
     } finally {
       setLoading(false)
     }
   }
 
-  // Get unique categories from expenses
-  const categories = ['all', ...Array.from(new Set(expenses.map(e => e.category)))]
+  const handleAddCategory = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    const formData = new FormData(event.currentTarget)
+    
+    try {
+      await addExpenseCategory({
+        name: formData.get('name') as string,
+        description: formData.get('description') as string || undefined
+      })
+      
+      setIsAddCategoryOpen(false)
+      await loadData()
+      ;(event.target as HTMLFormElement).reset()
+    } catch (error) {
+      console.error('Error adding expense category:', error)
+      alert('Error adding expense category')
+    }
+  }
+
+  const handleEditCategory = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!editingCategory) return
+    
+    const formData = new FormData(event.currentTarget)
+    
+    try {
+      await updateExpenseCategory(editingCategory.id, {
+        name: formData.get('name') as string,
+        description: formData.get('description') as string || undefined
+      })
+      
+      setIsEditCategoryOpen(false)
+      setEditingCategory(null)
+      await loadData()
+    } catch (error) {
+      console.error('Error updating expense category:', error)
+      alert('Error updating expense category')
+    }
+  }
+
+  const handleDeleteCategory = async (id: string, name: string) => {
+    if (confirm(`Are you sure you want to delete the expense category "${name}"?`)) {
+      try {
+        await deleteExpenseCategory(id)
+        await loadData()
+      } catch (error) {
+        console.error('Error deleting expense category:', error)
+        alert('Error deleting expense category')
+      }
+    }
+  }
+
+  const openEditCategory = (category: any) => {
+    setEditingCategory(category)
+    setIsEditCategoryOpen(true)
+  }
+
+  // Get all categories for filtering (from database + 'all' option)
+  const allCategories = ['all', ...expenseCategories.map(c => c.name)]
 
   const paymentMethods = ['Cash', 'Credit Card', 'Bank Transfer', 'Check']
 
@@ -105,7 +171,81 @@ export default function ExpensesPage() {
             Track and manage fuel station expenses
           </p>
         </div>
-        <Dialog>
+        <div className="flex gap-2">
+          <Dialog open={isCategoryManagerOpen} onOpenChange={setIsCategoryManagerOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline">
+                <Edit className="mr-2 h-4 w-4" />
+                Manage Categories
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>Manage Expense Categories</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div className="flex justify-end">
+                  <Dialog open={isAddCategoryOpen} onOpenChange={setIsAddCategoryOpen}>
+                    <DialogTrigger asChild>
+                      <Button size="sm">
+                        <Plus className="mr-2 h-4 w-4" />
+                        Add Category
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Add Expense Category</DialogTitle>
+                      </DialogHeader>
+                      <form onSubmit={handleAddCategory} className="space-y-4">
+                        <div>
+                          <Label htmlFor="add-category-name">Category Name</Label>
+                          <Input id="add-category-name" name="name" placeholder="e.g., Equipment" required />
+                        </div>
+                        <div>
+                          <Label htmlFor="add-category-description">Description (Optional)</Label>
+                          <Textarea id="add-category-description" name="description" placeholder="Brief description" rows={3} />
+                        </div>
+                        <Button type="submit" className="w-full">Add Category</Button>
+                      </form>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Description</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {expenseCategories.map((category) => (
+                      <TableRow key={category.id}>
+                        <TableCell className="font-medium">{category.name}</TableCell>
+                        <TableCell>{category.description || '-'}</TableCell>
+                        <TableCell>
+                          <div className="flex gap-2">
+                            <Button variant="ghost" size="icon" onClick={() => openEditCategory(category)}>
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="text-red-500"
+                              onClick={() => handleDeleteCategory(category.id, category.name)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </DialogContent>
+          </Dialog>
+          <Dialog>
           <DialogTrigger asChild>
             <Button>
               <Plus className="mr-2 h-4 w-4" />
@@ -124,9 +264,9 @@ export default function ExpensesPage() {
                     <SelectValue placeholder="Select category" />
                   </SelectTrigger>
                   <SelectContent>
-                    {categories.slice(1).map((category) => (
-                      <SelectItem key={category} value={category}>
-                        {category}
+                    {expenseCategories.map((category: any) => (
+                      <SelectItem key={category.id} value={category.name}>
+                        {category.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -244,7 +384,7 @@ export default function ExpensesPage() {
             <SelectValue placeholder="Filter by category" />
           </SelectTrigger>
           <SelectContent>
-            {categories.map((category) => (
+            {allCategories.map((category: string) => (
               <SelectItem key={category} value={category}>
                 {category === 'all' ? 'All Categories' : category}
               </SelectItem>
@@ -306,6 +446,36 @@ export default function ExpensesPage() {
           </Table>
         </CardContent>
       </Card>
+
+      {/* Edit Category Dialog */}
+      <Dialog open={isEditCategoryOpen} onOpenChange={setIsEditCategoryOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Expense Category</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleEditCategory} className="space-y-4">
+            <div>
+              <Label htmlFor="edit-category-name">Category Name</Label>
+              <Input 
+                id="edit-category-name" 
+                name="name" 
+                defaultValue={editingCategory?.name}
+                required 
+              />
+            </div>
+            <div>
+              <Label htmlFor="edit-category-description">Description (Optional)</Label>
+              <Textarea 
+                id="edit-category-description" 
+                name="description" 
+                defaultValue={editingCategory?.description || ''}
+                rows={3}
+              />
+            </div>
+            <Button type="submit" className="w-full">Update Category</Button>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
