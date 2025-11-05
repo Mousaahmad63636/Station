@@ -90,6 +90,39 @@ export const getContainers = async (): Promise<Container[]> => {
   return data || []
 }
 
+export const addContainer = async (container: { name: string; capacity: number; fuel_type: string; current_level?: number }) => {
+  const { data, error } = await supabase
+    .from('containers')
+    .insert([{
+      name: container.name,
+      capacity: container.capacity,
+      fuel_type: container.fuel_type,
+      current_level: container.current_level || 0
+    }])
+    .select()
+  
+  if (error) throw error
+  return data[0]
+}
+
+export const updateContainer = async (id: string, updates: { name?: string; capacity?: number; fuel_type?: string; current_level?: number }) => {
+  const { error } = await supabase
+    .from('containers')
+    .update(updates)
+    .eq('id', id)
+  
+  if (error) throw error
+}
+
+export const deleteContainer = async (id: string) => {
+  const { error } = await supabase
+    .from('containers')
+    .delete()
+    .eq('id', id)
+  
+  if (error) throw error
+}
+
 export const updateContainerLevel = async (id: string, newLevel: number) => {
   const { error } = await supabase
     .from('containers')

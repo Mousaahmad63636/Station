@@ -16,16 +16,23 @@ import {
   Pause,
   Play,
   BarChart3,
-  Calendar
+  Calendar,
+  Edit,
+  Trash2,
+  Database
 } from 'lucide-react'
 
-import { getContainers, getPumps, togglePumpStatus, resetDailyCounters, recordFuelSale, addPump } from '@/lib/database'
+import { getContainers, getPumps, togglePumpStatus, resetDailyCounters, recordFuelSale, addPump, addContainer, updateContainer, deleteContainer } from '@/lib/database'
 
 export default function PumpsPage() {
   const [selectedPump, setSelectedPump] = useState<string | null>(null)
   const [containers, setContainers] = useState<any[]>([])
   const [pumps, setPumps] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [isContainerManagerOpen, setIsContainerManagerOpen] = useState(false)
+  const [isAddContainerOpen, setIsAddContainerOpen] = useState(false)
+  const [editingContainer, setEditingContainer] = useState<any>(null)
+  const [isEditContainerOpen, setIsEditContainerOpen] = useState(false)
 
   useEffect(() => {
     loadData()
@@ -91,6 +98,67 @@ export default function PumpsPage() {
     }
   }
 
+  const handleAddContainer = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    const formData = new FormData(event.currentTarget)
+    
+    try {
+      await addContainer({
+        name: formData.get('name') as string,
+        capacity: parseFloat(formData.get('capacity') as string),
+        fuel_type: formData.get('fuel_type') as string,
+        current_level: parseFloat(formData.get('current_level') as string) || 0
+      })
+      
+      setIsAddContainerOpen(false)
+      await loadData()
+      ;(event.target as HTMLFormElement).reset()
+    } catch (error) {
+      console.error('Error adding container:', error)
+      alert('Error adding container')
+    }
+  }
+
+  const handleEditContainer = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!editingContainer) return
+    
+    const formData = new FormData(event.currentTarget)
+    
+    try {
+      await updateContainer(editingContainer.id, {
+        name: formData.get('name') as string,
+        capacity: parseFloat(formData.get('capacity') as string),
+        fuel_type: formData.get('fuel_type') as string,
+        current_level: parseFloat(formData.get('current_level') as string)
+      })
+      
+      setIsEditContainerOpen(false)
+      setEditingContainer(null)
+      await loadData()
+    } catch (error) {
+      console.error('Error updating container:', error)
+      alert('Error updating container')
+    }
+  }
+
+  const handleDeleteContainer = async (id: string, name: string) => {
+    if (confirm(`Are you sure you want to delete container "${name}"?`)) {
+      try {
+        await deleteContainer(id)
+        await loadData()
+      } catch (error) {
+        console.error('Error deleting container:', error)
+        alert('Error deleting container')
+      }
+    }
+  }
+
+  const openEditContainer = (container: any) => {
+    setEditingContainer(container)
+    setIsEditContainerOpen(true)
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -113,6 +181,159 @@ export default function PumpsPage() {
             <Calendar className="mr-2 h-4 w-4" />
             New Day Reset
           </Button>
+          <Dialog open={isContainerManagerOpen} onOpenChange={setIsContainerManagerOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline">
+                <Database className="mr-2 h-4 w-4" />
+                Manage Containers
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col">
+              <DialogHeader className="pb-4 flex-shrink-0">
+                <DialogTitle className="text-xl font-semibold">Manage Fuel Containers</DialogTitle>
+                <p className="text-sm text-muted-foreground">Add, edit, or remove fuel storage containers</p>
+              </DialogHeader>
+              <div className="flex-1 overflow-hidden flex flex-col space-y-4">
+                <div className="flex justify-between items-center flex-shrink-0">
+                  <div className="text-sm text-muted-foreground">
+                    {containers.length} containers total
+                  </div>
+                  <Dialog open={isAddContainerOpen} onOpenChange={setIsAddContainerOpen}>
+                    <DialogTrigger asChild>
+                      <Button>
+                        <Plus className="mr-2 h-4 w-4" />
+                        Add Container
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-md">
+                      <DialogHeader>
+                        <DialogTitle>Add New Container</DialogTitle>
+                        <p className="text-sm text-muted-foreground">Create a new fuel storage container</p>
+                      </DialogHeader>
+                      <form onSubmit={handleAddContainer} className="space-y-4 mt-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="container-name">Container Name *</Label>
+                          <Input 
+                            id="container-name" 
+                            name="name" 
+                            placeholder="e.g., Tank A, Main Tank" 
+                            required 
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="container-fuel-type">Fuel Type *</Label>
+                          <Select name="fuel_type" required>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select fuel type" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Regular Gasoline">Regular Gasoline</SelectItem>
+                              <SelectItem value="Premium Gasoline">Premium Gasoline</SelectItem>
+                              <SelectItem value="Diesel">Diesel</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="container-capacity">Capacity (Liters) *</Label>
+                            <Input 
+                              id="container-capacity" 
+                              name="capacity"
+                              type="number" 
+                              step="0.01"
+                              placeholder="10000" 
+                              required 
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="container-current-level">Current Level (Liters)</Label>
+                            <Input 
+                              id="container-current-level" 
+                              name="current_level"
+                              type="number" 
+                              step="0.01"
+                              placeholder="0" 
+                            />
+                          </div>
+                        </div>
+                        <div className="flex gap-2 pt-2">
+                          <Button type="button" variant="outline" className="flex-1" onClick={() => setIsAddContainerOpen(false)}>
+                            Cancel
+                          </Button>
+                          <Button type="submit" className="flex-1">Add Container</Button>
+                        </div>
+                      </form>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+                <div className="flex-1 overflow-auto border rounded-lg">
+                  <div className="p-4">
+                    {containers.length === 0 ? (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <Database className="mx-auto h-12 w-12 mb-4 opacity-50" />
+                        <p className="text-lg font-medium mb-2">No containers found</p>
+                        <p className="text-sm">Add your first fuel storage container to get started</p>
+                      </div>
+                    ) : (
+                      <div className="grid gap-4 md:grid-cols-2">
+                        {containers.map((container) => (
+                          <Card key={container.id}>
+                            <CardHeader className="pb-3">
+                              <div className="flex justify-between items-start">
+                                <div>
+                                  <CardTitle className="text-lg">{container.name}</CardTitle>
+                                  <p className="text-sm text-muted-foreground">{container.fuel_type}</p>
+                                </div>
+                                <div className="flex gap-1">
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm"
+                                    onClick={() => openEditContainer(container)}
+                                    className="h-8 w-8 p-0"
+                                  >
+                                    <Edit className="h-4 w-4" />
+                                  </Button>
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm"
+                                    className="h-8 w-8 p-0 text-red-600"
+                                    onClick={() => handleDeleteContainer(container.id, container.name)}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              </div>
+                            </CardHeader>
+                            <CardContent>
+                              <div className="space-y-2">
+                                <div className="flex justify-between text-sm">
+                                  <span>Capacity:</span>
+                                  <span>{container.capacity.toLocaleString()}L</span>
+                                </div>
+                                <div className="flex justify-between text-sm">
+                                  <span>Current Level:</span>
+                                  <span>{container.current_level.toLocaleString()}L</span>
+                                </div>
+                                <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
+                                  <div 
+                                    className="bg-blue-600 h-2 rounded-full" 
+                                    style={{ width: `${Math.min((container.current_level / container.capacity) * 100, 100)}%` }}
+                                  ></div>
+                                </div>
+                                <div className="text-xs text-muted-foreground text-center">
+                                  {((container.current_level / container.capacity) * 100).toFixed(1)}% full
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
           <Dialog>
             <DialogTrigger asChild>
               <Button>
@@ -289,6 +510,69 @@ export default function PumpsPage() {
           )
         })}
       </div>
+
+      {/* Edit Container Dialog */}
+      <Dialog open={isEditContainerOpen} onOpenChange={setIsEditContainerOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Container</DialogTitle>
+            <p className="text-sm text-muted-foreground">Update container information</p>
+          </DialogHeader>
+          <form onSubmit={handleEditContainer} className="space-y-4 mt-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-container-name">Container Name *</Label>
+              <Input 
+                id="edit-container-name" 
+                name="name" 
+                defaultValue={editingContainer?.name}
+                required 
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-container-fuel-type">Fuel Type *</Label>
+              <Select name="fuel_type" defaultValue={editingContainer?.fuel_type} required>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select fuel type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Regular Gasoline">Regular Gasoline</SelectItem>
+                  <SelectItem value="Premium Gasoline">Premium Gasoline</SelectItem>
+                  <SelectItem value="Diesel">Diesel</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-container-capacity">Capacity (Liters) *</Label>
+                <Input 
+                  id="edit-container-capacity" 
+                  name="capacity"
+                  type="number" 
+                  step="0.01"
+                  defaultValue={editingContainer?.capacity}
+                  required 
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-container-current-level">Current Level (Liters)</Label>
+                <Input 
+                  id="edit-container-current-level" 
+                  name="current_level"
+                  type="number" 
+                  step="0.01"
+                  defaultValue={editingContainer?.current_level}
+                />
+              </div>
+            </div>
+            <div className="flex gap-2 pt-2">
+              <Button type="button" variant="outline" className="flex-1" onClick={() => setIsEditContainerOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" className="flex-1">Update Container</Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
