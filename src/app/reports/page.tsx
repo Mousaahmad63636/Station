@@ -21,7 +21,7 @@ import {
   FileText,
   Filter
 } from 'lucide-react'
-import { getDashboardStats, getSales, getExpenses, getPumps, getProducts } from '@/lib/database'
+import { getDashboardStats, getSales, getExpenses, getPumps, getProducts, getProductProfitData, getFuelProfitData } from '@/lib/database'
 
 export default function ReportsPage() {
   const [reportType, setReportType] = useState('daily')
@@ -31,6 +31,8 @@ export default function ReportsPage() {
   const [expenses, setExpenses] = useState<any[]>([])
   const [pumps, setPumps] = useState<any[]>([])
   const [products, setProducts] = useState<any[]>([])
+  const [productProfit, setProductProfit] = useState<any>({})
+  const [fuelProfit, setFuelProfit] = useState<any>({})
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -40,12 +42,14 @@ export default function ReportsPage() {
   const loadReportsData = async () => {
     try {
       setLoading(true)
-      const [statsData, salesData, expensesData, pumpsData, productsData] = await Promise.all([
+      const [statsData, salesData, expensesData, pumpsData, productsData, productProfitData, fuelProfitData] = await Promise.all([
         getDashboardStats(),
         getSales(100), // Get recent sales
         getExpenses(),
         getPumps(),
-        getProducts()
+        getProducts(),
+        getProductProfitData(),
+        getFuelProfitData()
       ])
       
       setStats(statsData)
@@ -53,6 +57,8 @@ export default function ReportsPage() {
       setExpenses(expensesData)
       setPumps(pumpsData)
       setProducts(productsData)
+      setProductProfit(productProfitData)
+      setFuelProfit(fuelProfitData)
     } catch (error) {
       console.error('Error loading reports data:', error)
     } finally {
@@ -212,6 +218,78 @@ export default function ReportsPage() {
             <div className="flex items-center gap-1 text-xs text-muted-foreground">
               {getTrendIcon(stats.netProfit || 0, 6050)}
               <span>+2.4% from yesterday</span>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Profit Breakdown */}
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Product Profit</CardTitle>
+            <Package className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">
+              ${productProfit.profit?.toFixed(2) || '0.00'}
+            </div>
+            <div className="text-xs text-muted-foreground mt-1">
+              Revenue: ${productProfit.revenue?.toFixed(2) || '0.00'}
+            </div>
+            <div className="text-xs text-muted-foreground">
+              Cost: ${productProfit.cost?.toFixed(2) || '0.00'}
+            </div>
+            <div className="text-xs font-medium mt-2">
+              Margin: {productProfit.margin?.toFixed(1) || '0.0'}%
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Fuel Profit</CardTitle>
+            <Fuel className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">
+              ${fuelProfit.profit?.toFixed(2) || '0.00'}
+            </div>
+            <div className="text-xs text-muted-foreground mt-1">
+              Revenue: ${fuelProfit.revenue?.toFixed(2) || '0.00'}
+            </div>
+            <div className="text-xs text-muted-foreground">
+              Cost: ${fuelProfit.cost?.toFixed(2) || '0.00'}
+            </div>
+            <div className="text-xs font-medium mt-2">
+              Margin: {fuelProfit.margin?.toFixed(1) || '0.0'}%
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Profit</CardTitle>
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">
+              ${((productProfit.profit || 0) + (fuelProfit.profit || 0)).toFixed(2)}
+            </div>
+            <div className="text-xs text-muted-foreground mt-1">
+              Combined revenue & costs
+            </div>
+            <div className="grid grid-cols-2 gap-2 mt-2 text-xs">
+              <div>
+                <span className="text-muted-foreground">Products:</span>
+                <br />
+                <span className="font-medium">${productProfit.profit?.toFixed(2) || '0.00'}</span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Fuel:</span>
+                <br />
+                <span className="font-medium">${fuelProfit.profit?.toFixed(2) || '0.00'}</span>
+              </div>
             </div>
           </CardContent>
         </Card>

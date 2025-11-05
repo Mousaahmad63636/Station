@@ -97,7 +97,12 @@ export default function ExpensesPage() {
   }
 
   const handleDeleteCategory = async (id: string, name: string) => {
-    if (confirm(`Are you sure you want to delete the expense category "${name}"?`)) {
+    if (name === 'Fuel Purchase') {
+      alert('Cannot delete "Fuel Purchase" category - it is required for fuel cost tracking.')
+      return
+    }
+    
+    if (confirm(`Are you sure you want to delete category "${name}"?`)) {
       try {
         await deleteExpenseCategory(id)
         await loadData()

@@ -158,6 +158,104 @@ export const getFuelPrice = async (fuelType: string) => {
   return data?.price_per_liter || 1.50 // Default fallback price
 }
 
+// Fuel Purchase functions
+export const addFuelPurchase = async (purchase: {
+  container_id: string;
+  liters_purchased: number;
+  cost_per_liter: number;
+  total_cost: number;
+  supplier?: string;
+  invoice_number?: string;
+}) => {
+  const { data, error } = await supabase
+    .from('fuel_purchases')
+    .insert([purchase])
+    .select()
+  
+  if (error) throw error
+  return data[0]
+}
+
+export const getFuelPurchases = async (containerId?: string) => {
+  let query = supabase
+    .from('fuel_purchases')
+    .select(`
+      *,
+      containers (name, fuel_type)
+    `)
+    .order('purchase_date', { ascending: false })
+  
+  if (containerId) {
+    query = query.eq('container_id', containerId)
+  }
+  
+  const { data, error } = await query
+  if (error) throw error
+  return data || []
+}
+
+export const refillContainer = async (
+  containerId: string, 
+  litersAdded: number, 
+  costPerLiter: number,
+  supplier?: string,
+  invoiceNumber?: string
+) => {
+  // Start a transaction-like operation
+  try {
+    // 1. Get current container info
+    const { data: container, error: containerError } = await supabase
+      .from('containers')
+      .select('*')
+      .eq('id', containerId)
+      .single()
+    
+    if (containerError) throw containerError
+    
+    const newLevel = container.current_level + litersAdded
+    const totalCost = litersAdded * costPerLiter
+    
+    // 2. Update container level and average cost
+    const totalLitersEver = container.current_level + litersAdded
+    const newAverageCost = totalLitersEver > 0 
+      ? ((container.average_cost_per_liter * container.current_level) + totalCost) / totalLitersEver
+      : costPerLiter
+    
+    const { error: updateError } = await supabase
+      .from('containers')
+      .update({ 
+        current_level: Math.min(newLevel, container.capacity),
+        average_cost_per_liter: newAverageCost
+      })
+      .eq('id', containerId)
+    
+    if (updateError) throw updateError
+    
+    // 3. Record fuel purchase
+    await addFuelPurchase({
+      container_id: containerId,
+      liters_purchased: litersAdded,
+      cost_per_liter: costPerLiter,
+      total_cost: totalCost,
+      supplier,
+      invoice_number: invoiceNumber
+    })
+    
+    // 4. Add to expenses
+    await addExpense({
+      category: 'Fuel Purchase',
+      description: `Refilled ${container.name} - ${litersAdded}L of ${container.fuel_type}`,
+      amount: totalCost,
+      payment_method: 'Bank Transfer',
+      vendor: supplier
+    })
+    
+    return { success: true, newLevel: Math.min(newLevel, container.capacity) }
+  } catch (error) {
+    throw error
+  }
+}
+
 export const updateContainerLevel = async (id: string, newLevel: number) => {
   const { error } = await supabase
     .from('containers')
@@ -165,6 +263,76 @@ export const updateContainerLevel = async (id: string, newLevel: number) => {
     .eq('id', id)
   
   if (error) throw error
+}
+
+// Profit calculation functions
+export const getProductProfitData = async () => {
+  const { data: sales, error: salesError } = await supabase
+    .from('sales')
+    .select(`
+      *,
+      sale_items (
+        product_id,
+        quantity,
+        price,
+        products (name, cost_price, sale_price)
+      )
+    `)
+    .gte('created_at', new Date(new Date().setHours(0, 0, 0, 0)).toISOString())
+  
+  if (salesError) throw salesError
+  
+  let totalRevenue = 0
+  let totalCost = 0
+  
+  sales?.forEach(sale => {
+    sale.sale_items?.forEach((item: any) => {
+      const revenue = item.quantity * item.price
+      const cost = item.quantity * (item.products?.cost_price || 0)
+      totalRevenue += revenue
+      totalCost += cost
+    })
+  })
+  
+  return {
+    revenue: totalRevenue,
+    cost: totalCost,
+    profit: totalRevenue - totalCost,
+    margin: totalRevenue > 0 ? ((totalRevenue - totalCost) / totalRevenue) * 100 : 0
+  }
+}
+
+export const getFuelProfitData = async () => {
+  // Get fuel sales from today
+  const { data: fuelSales, error: salesError } = await supabase
+    .from('fuel_sales')
+    .select(`
+      *,
+      pumps (
+        fuel_type,
+        containers (average_cost_per_liter)
+      )
+    `)
+    .gte('sale_date', new Date(new Date().setHours(0, 0, 0, 0)).toISOString())
+  
+  if (salesError) throw salesError
+  
+  let totalRevenue = 0
+  let totalCost = 0
+  
+  fuelSales?.forEach(sale => {
+    const revenue = sale.total_amount
+    const cost = sale.liters * (sale.pumps?.containers?.average_cost_per_liter || 0)
+    totalRevenue += revenue
+    totalCost += cost
+  })
+  
+  return {
+    revenue: totalRevenue,
+    cost: totalCost,
+    profit: totalRevenue - totalCost,
+    margin: totalRevenue > 0 ? ((totalRevenue - totalCost) / totalRevenue) * 100 : 0
+  }
 }
 
 // Pump functions

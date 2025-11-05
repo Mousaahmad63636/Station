@@ -22,7 +22,7 @@ import {
   Database
 } from 'lucide-react'
 
-import { getContainers, getPumps, togglePumpStatus, resetDailyCounters, recordFuelSale, addPump, addContainer, updateContainer, deleteContainer, getFuelPrice } from '@/lib/database'
+import { getContainers, getPumps, togglePumpStatus, resetDailyCounters, recordFuelSale, addPump, addContainer, updateContainer, deleteContainer, getFuelPrice, refillContainer } from '@/lib/database'
 
 export default function PumpsPage() {
   const [selectedPump, setSelectedPump] = useState<string | null>(null)
@@ -37,6 +37,8 @@ export default function PumpsPage() {
   const [isCounterReadingOpen, setIsCounterReadingOpen] = useState(false)
   const [selectedPumpForReading, setSelectedPumpForReading] = useState<any>(null)
   const [defaultFuelPrice, setDefaultFuelPrice] = useState<number>(1.50)
+  const [isRefillContainerOpen, setIsRefillContainerOpen] = useState(false)
+  const [selectedContainerForRefill, setSelectedContainerForRefill] = useState<any>(null)
 
   useEffect(() => {
     loadData()
@@ -218,6 +220,51 @@ export default function PumpsPage() {
       setSelectedPumpForReading(pump)
       setDefaultFuelPrice(1.50) // Fallback price
       setIsCounterReadingOpen(true)
+    }
+  }
+
+  const openRefillContainer = (container: any) => {
+    setSelectedContainerForRefill(container)
+    setIsRefillContainerOpen(true)
+  }
+
+  const handleRefillContainer = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!selectedContainerForRefill) return
+    
+    const formData = new FormData(event.currentTarget)
+    const litersAdded = parseFloat(formData.get('liters_added') as string)
+    const costPerLiter = parseFloat(formData.get('cost_per_liter') as string)
+    const supplier = formData.get('supplier') as string
+    const invoiceNumber = formData.get('invoice_number') as string
+    
+    if (litersAdded <= 0) {
+      alert('Liters added must be greater than 0')
+      return
+    }
+    
+    if (selectedContainerForRefill.current_level + litersAdded > selectedContainerForRefill.capacity) {
+      alert('Cannot exceed container capacity')
+      return
+    }
+    
+    try {
+      const result = await refillContainer(
+        selectedContainerForRefill.id,
+        litersAdded,
+        costPerLiter,
+        supplier || undefined,
+        invoiceNumber || undefined
+      )
+      
+      alert(`Container refilled successfully! New level: ${result.newLevel.toFixed(2)}L`)
+      setIsRefillContainerOpen(false)
+      setSelectedContainerForRefill(null)
+      await loadData()
+      ;(event.target as HTMLFormElement).reset()
+    } catch (error) {
+      console.error('Error refilling container:', error)
+      alert('Error refilling container')
     }
   }
 
@@ -480,6 +527,15 @@ export default function PumpsPage() {
                   {container.current_level}L / {container.capacity}L
                 </p>
               </div>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="w-full mt-3"
+                onClick={() => openRefillContainer(container)}
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Refill Container
+              </Button>
             </CardContent>
           </Card>
         ))}
@@ -674,6 +730,101 @@ export default function PumpsPage() {
                 Cancel
               </Button>
               <Button type="submit" className="flex-1">Record Counter Reading</Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Refill Container Dialog */}
+      <Dialog open={isRefillContainerOpen} onOpenChange={setIsRefillContainerOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Refill Container - {selectedContainerForRefill?.name}</DialogTitle>
+            <p className="text-sm text-muted-foreground">Add fuel and track purchase cost</p>
+          </DialogHeader>
+          <form onSubmit={handleRefillContainer} className="space-y-4 mt-4">
+            <div className="bg-gray-50 p-3 rounded">
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p className="text-muted-foreground">Current Level</p>
+                  <p className="font-bold">{selectedContainerForRefill?.current_level}L</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Capacity</p>
+                  <p className="font-bold">{selectedContainerForRefill?.capacity}L</p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="liters-added">Liters Added *</Label>
+              <Input 
+                id="liters-added" 
+                name="liters_added"
+                type="number" 
+                step="0.01"
+                placeholder="1000" 
+                required
+                max={selectedContainerForRefill ? selectedContainerForRefill.capacity - selectedContainerForRefill.current_level : undefined}
+                className="focus:ring-2 focus:ring-blue-500"
+              />
+              <p className="text-xs text-muted-foreground">
+                Available space: {selectedContainerForRefill ? (selectedContainerForRefill.capacity - selectedContainerForRefill.current_level).toFixed(2) : 0}L
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="cost-per-liter">Cost per Liter *</Label>
+              <Input 
+                id="cost-per-liter" 
+                name="cost_per_liter"
+                type="number" 
+                step="0.01"
+                placeholder="1.20" 
+                required
+                className="focus:ring-2 focus:ring-blue-500"
+              />
+              <p className="text-xs text-muted-foreground">
+                Your purchase cost (wholesale price)
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="supplier">Supplier</Label>
+              <Input 
+                id="supplier" 
+                name="supplier"
+                placeholder="Fuel Company Name" 
+                className="focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="invoice-number">Invoice Number</Label>
+              <Input 
+                id="invoice-number" 
+                name="invoice_number"
+                placeholder="INV-2024-001" 
+                className="focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            <div className="bg-blue-50 p-3 rounded">
+              <p className="text-sm text-blue-600">
+                <strong>What happens:</strong>
+              </p>
+              <ul className="text-xs text-blue-500 mt-1 space-y-1">
+                <li>• Container level will be updated</li>
+                <li>• Purchase cost will be added to expenses as "Fuel Purchase"</li>
+                <li>• Average fuel cost will be calculated for profit tracking</li>
+              </ul>
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <Button type="button" variant="outline" className="flex-1" onClick={() => setIsRefillContainerOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" className="flex-1">Refill Container</Button>
             </div>
           </form>
         </DialogContent>
