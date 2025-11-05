@@ -1,0 +1,115 @@
+-- WARNING: This schema is for context only and is not meant to be run.
+-- Table order and constraints may not be valid for execution.
+
+CREATE TABLE public.categories (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  name character varying NOT NULL UNIQUE,
+  description text,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT categories_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.containers (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  name character varying NOT NULL,
+  capacity numeric NOT NULL,
+  current_level numeric NOT NULL DEFAULT 0,
+  fuel_type character varying NOT NULL,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  average_cost_per_liter numeric DEFAULT 0,
+  CONSTRAINT containers_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.daily_summaries (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  date date NOT NULL UNIQUE,
+  total_fuel_sales numeric DEFAULT 0,
+  total_product_sales numeric DEFAULT 0,
+  total_expenses numeric DEFAULT 0,
+  net_profit numeric DEFAULT 0,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT daily_summaries_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.expense_categories (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  name character varying NOT NULL UNIQUE,
+  description text,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT expense_categories_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.expenses (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  category character varying NOT NULL,
+  description text NOT NULL,
+  amount numeric NOT NULL,
+  payment_method character varying NOT NULL,
+  receipt_number character varying,
+  vendor character varying,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT expenses_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.fuel_prices (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  fuel_type character varying NOT NULL UNIQUE,
+  price_per_liter numeric NOT NULL,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT fuel_prices_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.fuel_purchases (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  container_id uuid,
+  liters_purchased numeric NOT NULL,
+  cost_per_liter numeric NOT NULL,
+  total_cost numeric NOT NULL,
+  supplier character varying,
+  invoice_number character varying,
+  purchase_date timestamp with time zone DEFAULT now(),
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT fuel_purchases_pkey PRIMARY KEY (id),
+  CONSTRAINT fuel_purchases_container_id_fkey FOREIGN KEY (container_id) REFERENCES public.containers(id)
+);
+CREATE TABLE public.products (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  barcode character varying NOT NULL UNIQUE,
+  name character varying NOT NULL,
+  category character varying NOT NULL,
+  cost_price numeric NOT NULL,
+  sale_price numeric NOT NULL,
+  current_stock integer NOT NULL DEFAULT 0,
+  min_stock_level integer NOT NULL DEFAULT 0,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT products_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.pumps (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  name character varying NOT NULL,
+  container_id uuid,
+  total_counter numeric NOT NULL DEFAULT 0,
+  daily_counter numeric NOT NULL DEFAULT 0,
+  is_active boolean DEFAULT true,
+  fuel_type character varying NOT NULL,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT pumps_pkey PRIMARY KEY (id),
+  CONSTRAINT pumps_container_id_fkey FOREIGN KEY (container_id) REFERENCES public.containers(id)
+);
+CREATE TABLE public.sales (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  type character varying NOT NULL CHECK (type::text = ANY (ARRAY['fuel'::character varying, 'product'::character varying]::text[])),
+  pump_id uuid,
+  product_id uuid,
+  quantity numeric NOT NULL,
+  unit_price numeric NOT NULL,
+  total_amount numeric NOT NULL,
+  payment_method character varying NOT NULL,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT sales_pkey PRIMARY KEY (id),
+  CONSTRAINT sales_pump_id_fkey FOREIGN KEY (pump_id) REFERENCES public.pumps(id),
+  CONSTRAINT sales_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id)
+);
