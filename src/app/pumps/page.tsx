@@ -314,14 +314,16 @@ export default function PumpsPage() {
                                   <span>Current Level:</span>
                                   <span>{container.current_level.toLocaleString()}L</span>
                                 </div>
-                                <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
+                                <div className="w-full bg-gray-200 rounded-full h-2 mt-2 overflow-hidden">
                                   <div 
-                                    className="bg-blue-600 h-2 rounded-full" 
-                                    style={{ width: `${Math.min((container.current_level / container.capacity) * 100, 100)}%` }}
+                                    className="bg-blue-600 h-2 rounded-full transition-all duration-300" 
+                                    style={{ 
+                                      width: `${Math.min(Math.max((container.current_level / container.capacity) * 100, 0), 100)}%` 
+                                    }}
                                   ></div>
                                 </div>
-                                <div className="text-xs text-muted-foreground text-center">
-                                  {((container.current_level / container.capacity) * 100).toFixed(1)}% full
+                                <div className="text-xs text-muted-foreground text-center mt-1">
+                                  {Math.min(Math.max(((container.current_level / container.capacity) * 100), 0), 100).toFixed(1)}% full
                                 </div>
                               </div>
                             </CardContent>
