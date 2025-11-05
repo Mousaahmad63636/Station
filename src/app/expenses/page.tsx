@@ -179,69 +179,100 @@ export default function ExpensesPage() {
                 Manage Categories
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-2xl">
-              <DialogHeader>
-                <DialogTitle>Manage Expense Categories</DialogTitle>
+            <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden">
+              <DialogHeader className="pb-4">
+                <DialogTitle className="text-xl font-semibold">Manage Expense Categories</DialogTitle>
+                <p className="text-sm text-muted-foreground">Add, edit, or remove expense categories for better organization</p>
               </DialogHeader>
-              <div className="space-y-4">
-                <div className="flex justify-end">
+              <div className="space-y-6">
+                <div className="flex justify-between items-center">
+                  <div className="text-sm text-muted-foreground">
+                    {expenseCategories.length} categories total
+                  </div>
                   <Dialog open={isAddCategoryOpen} onOpenChange={setIsAddCategoryOpen}>
                     <DialogTrigger asChild>
-                      <Button size="sm">
+                      <Button>
                         <Plus className="mr-2 h-4 w-4" />
                         Add Category
                       </Button>
                     </DialogTrigger>
-                    <DialogContent>
+                    <DialogContent className="sm:max-w-md">
                       <DialogHeader>
-                        <DialogTitle>Add Expense Category</DialogTitle>
+                        <DialogTitle>Add New Category</DialogTitle>
+                        <p className="text-sm text-muted-foreground">Create a new expense category</p>
                       </DialogHeader>
-                      <form onSubmit={handleAddCategory} className="space-y-4">
-                        <div>
-                          <Label htmlFor="add-category-name">Category Name</Label>
-                          <Input id="add-category-name" name="name" placeholder="e.g., Equipment" required />
+                      <form onSubmit={handleAddCategory} className="space-y-4 mt-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="add-category-name">Category Name *</Label>
+                          <Input 
+                            id="add-category-name" 
+                            name="name" 
+                            placeholder="e.g., Equipment, Utilities" 
+                            required 
+                            className="focus:ring-2 focus:ring-blue-500"
+                          />
                         </div>
-                        <div>
-                          <Label htmlFor="add-category-description">Description (Optional)</Label>
-                          <Textarea id="add-category-description" name="description" placeholder="Brief description" rows={3} />
+                        <div className="space-y-2">
+                          <Label htmlFor="add-category-description">Description</Label>
+                          <Textarea 
+                            id="add-category-description" 
+                            name="description" 
+                            placeholder="Brief description of this category (optional)"
+                            rows={3}
+                            className="resize-none focus:ring-2 focus:ring-blue-500"
+                          />
                         </div>
-                        <Button type="submit" className="w-full">Add Category</Button>
+                        <div className="flex gap-2 pt-2">
+                          <Button type="button" variant="outline" className="flex-1" onClick={() => setIsAddCategoryOpen(false)}>
+                            Cancel
+                          </Button>
+                          <Button type="submit" className="flex-1">Add Category</Button>
+                        </div>
                       </form>
                     </DialogContent>
                   </Dialog>
                 </div>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Description</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {expenseCategories.map((category) => (
-                      <TableRow key={category.id}>
-                        <TableCell className="font-medium">{category.name}</TableCell>
-                        <TableCell>{category.description || '-'}</TableCell>
-                        <TableCell>
-                          <div className="flex gap-2">
-                            <Button variant="ghost" size="icon" onClick={() => openEditCategory(category)}>
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              className="text-red-500"
-                              onClick={() => handleDeleteCategory(category.id, category.name)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
+                <div className="border rounded-lg overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-muted/50">
+                        <TableHead className="font-semibold">Category Name</TableHead>
+                        <TableHead className="font-semibold">Description</TableHead>
+                        <TableHead className="font-semibold w-24">Actions</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {expenseCategories.map((category) => (
+                        <TableRow key={category.id} className="hover:bg-muted/30">
+                          <TableCell className="font-medium py-4">{category.name}</TableCell>
+                          <TableCell className="py-4 text-muted-foreground">
+                            {category.description || 'No description'}
+                          </TableCell>
+                          <TableCell className="py-4">
+                            <div className="flex gap-1">
+                              <Button 
+                                variant="ghost" 
+                                size="sm"
+                                onClick={() => openEditCategory(category)}
+                                className="h-8 w-8 p-0 hover:bg-blue-100"
+                              >
+                                <Edit className="h-4 w-4 text-blue-600" />
+                              </Button>
+                              <Button 
+                                variant="ghost" 
+                                size="sm"
+                                className="h-8 w-8 p-0 hover:bg-red-100"
+                                onClick={() => handleDeleteCategory(category.id, category.name)}
+                              >
+                                <Trash2 className="h-4 w-4 text-red-600" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
               </div>
             </DialogContent>
           </Dialog>
@@ -450,30 +481,39 @@ export default function ExpensesPage() {
 
       {/* Edit Category Dialog */}
       <Dialog open={isEditCategoryOpen} onOpenChange={setIsEditCategoryOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Edit Expense Category</DialogTitle>
+            <DialogTitle>Edit Category</DialogTitle>
+            <p className="text-sm text-muted-foreground">Update category information</p>
           </DialogHeader>
-          <form onSubmit={handleEditCategory} className="space-y-4">
-            <div>
-              <Label htmlFor="edit-category-name">Category Name</Label>
+          <form onSubmit={handleEditCategory} className="space-y-4 mt-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-category-name">Category Name *</Label>
               <Input 
                 id="edit-category-name" 
                 name="name" 
                 defaultValue={editingCategory?.name}
                 required 
+                className="focus:ring-2 focus:ring-blue-500"
               />
             </div>
-            <div>
-              <Label htmlFor="edit-category-description">Description (Optional)</Label>
+            <div className="space-y-2">
+              <Label htmlFor="edit-category-description">Description</Label>
               <Textarea 
                 id="edit-category-description" 
                 name="description" 
                 defaultValue={editingCategory?.description || ''}
+                placeholder="Brief description of this category (optional)"
                 rows={3}
+                className="resize-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
-            <Button type="submit" className="w-full">Update Category</Button>
+            <div className="flex gap-2 pt-2">
+              <Button type="button" variant="outline" className="flex-1" onClick={() => setIsEditCategoryOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" className="flex-1">Update Category</Button>
+            </div>
           </form>
         </DialogContent>
       </Dialog>
