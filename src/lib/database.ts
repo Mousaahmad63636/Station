@@ -371,7 +371,7 @@ export const getFuelProfitData = async () => {
     // Get fuel sales from today - only sales with pump_id
     const { data: fuelSales, error: salesError } = await supabase
       .from('sales')
-      .select('id, total_amount, liters, pump_id, created_at')
+      .select('id, total_amount, pump_id, created_at')
       .not('pump_id', 'is', null)
       .gte('created_at', new Date(new Date().setHours(0, 0, 0, 0)).toISOString())
     
@@ -387,12 +387,14 @@ export const getFuelProfitData = async () => {
     
     fuelSales?.forEach(sale => {
       const revenue = sale.total_amount || 0
-      const liters = sale.liters || 0
-      // Use estimated cost of $1.20 per liter until we have proper cost tracking
-      const cost = liters * 1.20
+      // Since we don't have liters column, estimate liters from revenue
+      // Assuming average fuel price of $1.50 per liter
+      const estimatedLiters = revenue / 1.50
+      // Use estimated cost of $1.20 per liter
+      const cost = estimatedLiters * 1.20
       totalRevenue += revenue
       totalCost += cost
-      console.log(`Fuel sale ${sale.id}: $${revenue} revenue, ${liters}L, $${cost} cost`)
+      console.log(`Fuel sale ${sale.id}: $${revenue} revenue, ~${estimatedLiters.toFixed(1)}L estimated, $${cost.toFixed(2)} cost`)
     })
     
     console.log('Total fuel revenue:', totalRevenue, 'Total fuel cost:', totalCost)
