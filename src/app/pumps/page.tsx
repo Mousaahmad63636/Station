@@ -22,7 +22,7 @@ import {
   Database
 } from 'lucide-react'
 
-import { getContainers, getPumps, togglePumpStatus, resetDailyCounters, recordFuelSale, addPump, addContainer, updateContainer, deleteContainer, deletePump, getFuelPrice, refillContainer, getSalesForPump, deleteAllSalesForPump } from '@/lib/database'
+import { getContainers, getPumps, togglePumpStatus, resetDailyCounters, recordFuelSale, addPump, addContainer, updateContainer, deleteContainer, deletePump, getFuelPrice, refillContainer, getSalesForPump, deleteAllSalesForPump, getPumpsForContainer, deleteAllPumpsForContainer } from '@/lib/database'
 
 export default function PumpsPage() {
   const [selectedPump, setSelectedPump] = useState<string | null>(null)
@@ -169,7 +169,27 @@ export default function PumpsPage() {
       } catch (error: any) {
         console.error('Error deleting container:', error)
         const errorMessage = error.message || 'Error deleting container'
-        alert(errorMessage)
+        
+        // If it's a foreign key constraint error, offer to delete connected pumps
+        if (errorMessage.includes('pumps connected')) {
+          const deleteWithPumps = confirm(
+            `${errorMessage}\n\nWould you like to delete ALL connected pumps and their sales records first? This action cannot be undone!\n\nClick OK to delete all pumps, their sales records, and the container, or Cancel to keep everything.`
+          )
+          
+          if (deleteWithPumps) {
+            try {
+              await deleteAllPumpsForContainer(id)
+              await deleteContainer(id)
+              await loadData()
+              alert(`Container "${name}" and all its connected pumps and sales records deleted successfully!`)
+            } catch (deleteError: any) {
+              console.error('Error force deleting container:', deleteError)
+              alert(`Error during force deletion: ${deleteError.message || 'Unknown error'}`)
+            }
+          }
+        } else {
+          alert(errorMessage)
+        }
       }
     }
   }

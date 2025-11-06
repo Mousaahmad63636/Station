@@ -118,14 +118,19 @@ export const deleteContainer = async (id: string) => {
   // First check if there are any pumps connected to this container
   const { data: pumpsData, error: pumpsError } = await supabase
     .from('pumps')
-    .select('id, name')
+    .select('id, name, created_at')
     .eq('container_id', id)
-    .limit(1)
+    .limit(5) // Get a few records to show in error message
   
-  if (pumpsError) throw pumpsError
+  if (pumpsError) {
+    console.error('Error checking pumps for container:', pumpsError)
+    throw pumpsError
+  }
   
   if (pumpsData && pumpsData.length > 0) {
-    throw new Error('Cannot delete container: There are pumps connected to this container. Please delete or reassign the pumps first.')
+    const pumpCount = pumpsData.length
+    const pumpNames = pumpsData.map(p => p.name).join(', ')
+    throw new Error(`Cannot delete container: There are ${pumpCount}+ pumps connected to this container (${pumpNames}). You must delete or reassign the pumps first before deleting the container.`)
   }
   
   // If no pumps connected, proceed with deletion
@@ -134,7 +139,10 @@ export const deleteContainer = async (id: string) => {
     .delete()
     .eq('id', id)
   
-  if (error) throw error
+  if (error) {
+    console.error('Database error deleting container:', error)
+    throw new Error(`Failed to delete container: ${error.message}`)
+  }
 }
 
 // Fuel Prices functions
@@ -679,6 +687,37 @@ export const deleteAllSalesForProduct = async (productId: string) => {
     .from('sales')
     .delete()
     .eq('product_id', productId)
+  
+  if (error) throw error
+}
+
+// Helper function to get pumps for a specific container
+export const getPumpsForContainer = async (containerId: string) => {
+  const { data, error } = await supabase
+    .from('pumps')
+    .select('*')
+    .eq('container_id', containerId)
+    .order('name')
+  
+  if (error) throw error
+  return data || []
+}
+
+// Helper function to delete all pumps for a container (use with caution!)
+export const deleteAllPumpsForContainer = async (containerId: string) => {
+  // First get all pumps for this container
+  const pumps = await getPumpsForContainer(containerId)
+  
+  // Delete sales records for each pump first
+  for (const pump of pumps) {
+    await deleteAllSalesForPump(pump.id)
+  }
+  
+  // Then delete all pumps
+  const { error } = await supabase
+    .from('pumps')
+    .delete()
+    .eq('container_id', containerId)
   
   if (error) throw error
 }
