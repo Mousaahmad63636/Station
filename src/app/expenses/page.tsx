@@ -146,9 +146,11 @@ export default function ExpensesPage() {
       try {
         await deleteExpense(id)
         await loadData()
-      } catch (error) {
+        alert(`Expense "${description}" deleted successfully!`)
+      } catch (error: any) {
         console.error('Error deleting expense:', error)
-        alert('Error deleting expense')
+        const errorMessage = error.message || 'Error deleting expense'
+        alert(errorMessage)
       }
     }
   }

@@ -22,7 +22,7 @@ import {
   Database
 } from 'lucide-react'
 
-import { getContainers, getPumps, togglePumpStatus, resetDailyCounters, recordFuelSale, addPump, addContainer, updateContainer, deleteContainer, deletePump, getFuelPrice, refillContainer } from '@/lib/database'
+import { getContainers, getPumps, togglePumpStatus, resetDailyCounters, recordFuelSale, addPump, addContainer, updateContainer, deleteContainer, deletePump, getFuelPrice, refillContainer, getSalesForPump, deleteAllSalesForPump } from '@/lib/database'
 
 export default function PumpsPage() {
   const [selectedPump, setSelectedPump] = useState<string | null>(null)
@@ -165,9 +165,11 @@ export default function PumpsPage() {
       try {
         await deleteContainer(id)
         await loadData()
-      } catch (error) {
+        alert(`Container "${name}" deleted successfully!`)
+      } catch (error: any) {
         console.error('Error deleting container:', error)
-        alert('Error deleting container')
+        const errorMessage = error.message || 'Error deleting container'
+        alert(errorMessage)
       }
     }
   }
@@ -213,9 +215,31 @@ export default function PumpsPage() {
       try {
         await deletePump(id)
         await loadData()
-      } catch (error) {
+        alert(`Pump "${name}" deleted successfully!`)
+      } catch (error: any) {
         console.error('Error deleting pump:', error)
-        alert('Error deleting pump')
+        const errorMessage = error.message || 'Error deleting pump'
+        
+        // If it's a foreign key constraint error, offer to delete sales records
+        if (errorMessage.includes('sales records')) {
+          const deleteWithSales = confirm(
+            `${errorMessage}\n\nWould you like to delete ALL sales records for this pump first? This action cannot be undone!\n\nClick OK to delete all sales records and the pump, or Cancel to keep everything.`
+          )
+          
+          if (deleteWithSales) {
+            try {
+              await deleteAllSalesForPump(id)
+              await deletePump(id)
+              await loadData()
+              alert(`Pump "${name}" and all its sales records deleted successfully!`)
+            } catch (deleteError: any) {
+              console.error('Error force deleting pump:', deleteError)
+              alert(`Error during force deletion: ${deleteError.message || 'Unknown error'}`)
+            }
+          }
+        } else {
+          alert(errorMessage)
+        }
       }
     }
   }

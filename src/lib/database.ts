@@ -115,6 +115,20 @@ export const updateContainer = async (id: string, updates: { name?: string; capa
 }
 
 export const deleteContainer = async (id: string) => {
+  // First check if there are any pumps connected to this container
+  const { data: pumpsData, error: pumpsError } = await supabase
+    .from('pumps')
+    .select('id, name')
+    .eq('container_id', id)
+    .limit(1)
+  
+  if (pumpsError) throw pumpsError
+  
+  if (pumpsData && pumpsData.length > 0) {
+    throw new Error('Cannot delete container: There are pumps connected to this container. Please delete or reassign the pumps first.')
+  }
+  
+  // If no pumps connected, proceed with deletion
   const { error } = await supabase
     .from('containers')
     .delete()
@@ -471,12 +485,34 @@ export const addPump = async (pump: Omit<Pump, 'id' | 'created_at' | 'updated_at
 }
 
 export const deletePump = async (id: string) => {
+  // First check if there are any sales records for this pump
+  const { data: salesData, error: salesError } = await supabase
+    .from('sales')
+    .select('id, created_at')
+    .eq('pump_id', id)
+    .limit(5) // Get a few records to show in error message
+  
+  if (salesError) {
+    console.error('Error checking sales for pump:', salesError)
+    throw salesError
+  }
+  
+  if (salesData && salesData.length > 0) {
+    const salesCount = salesData.length
+    const latestSale = new Date(salesData[0].created_at).toLocaleDateString()
+    throw new Error(`Cannot delete pump: There are ${salesCount}+ sales records for this pump (latest: ${latestSale}). You must delete all related sales records first before deleting the pump.`)
+  }
+  
+  // If no sales records, proceed with deletion
   const { error } = await supabase
     .from('pumps')
     .delete()
     .eq('id', id)
   
-  if (error) throw error
+  if (error) {
+    console.error('Database error deleting pump:', error)
+    throw new Error(`Failed to delete pump: ${error.message}`)
+  }
 }
 
 // Product functions
@@ -519,12 +555,34 @@ export const updateProduct = async (id: string, updates: Partial<Product>) => {
 }
 
 export const deleteProduct = async (id: string) => {
+  // First check if there are any sales records for this product
+  const { data: salesData, error: salesError } = await supabase
+    .from('sales')
+    .select('id, created_at')
+    .eq('product_id', id)
+    .limit(5) // Get a few records to show in error message
+  
+  if (salesError) {
+    console.error('Error checking sales for product:', salesError)
+    throw salesError
+  }
+  
+  if (salesData && salesData.length > 0) {
+    const salesCount = salesData.length
+    const latestSale = new Date(salesData[0].created_at).toLocaleDateString()
+    throw new Error(`Cannot delete product: There are ${salesCount}+ sales records for this product (latest: ${latestSale}). You must delete all related sales records first before deleting the product.`)
+  }
+  
+  // If no sales records, proceed with deletion
   const { error } = await supabase
     .from('products')
     .delete()
     .eq('id', id)
   
-  if (error) throw error
+  if (error) {
+    console.error('Database error deleting product:', error)
+    throw new Error(`Failed to delete product: ${error.message}`)
+  }
 }
 
 // Sales functions
@@ -571,6 +629,56 @@ export const deleteSale = async (id: string) => {
     .from('sales')
     .delete()
     .eq('id', id)
+  
+  if (error) throw error
+}
+
+// Helper function to get sales for a specific pump
+export const getSalesForPump = async (pumpId: string) => {
+  const { data, error } = await supabase
+    .from('sales')
+    .select(`
+      *,
+      pumps(name, fuel_type)
+    `)
+    .eq('pump_id', pumpId)
+    .order('created_at', { ascending: false })
+  
+  if (error) throw error
+  return data || []
+}
+
+// Helper function to get sales for a specific product
+export const getSalesForProduct = async (productId: string) => {
+  const { data, error } = await supabase
+    .from('sales')
+    .select(`
+      *,
+      products(name, category)
+    `)
+    .eq('product_id', productId)
+    .order('created_at', { ascending: false })
+  
+  if (error) throw error
+  return data || []
+}
+
+// Helper function to delete all sales for a pump (use with caution!)
+export const deleteAllSalesForPump = async (pumpId: string) => {
+  const { error } = await supabase
+    .from('sales')
+    .delete()
+    .eq('pump_id', pumpId)
+  
+  if (error) throw error
+}
+
+// Helper function to delete all sales for a product (use with caution!)
+export const deleteAllSalesForProduct = async (productId: string) => {
+  const { error } = await supabase
+    .from('sales')
+    .delete()
+    .eq('product_id', productId)
   
   if (error) throw error
 }

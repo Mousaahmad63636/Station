@@ -19,7 +19,7 @@ import {
   DollarSign,
   Trash2
 } from 'lucide-react'
-import { getProducts, addProduct, updateProduct, updateProductStock, deleteProduct, getCategories } from '@/lib/database'
+import { getProducts, addProduct, updateProduct, updateProductStock, deleteProduct, getCategories, getSalesForProduct, deleteAllSalesForProduct } from '@/lib/database'
 
 export default function InventoryPage() {
   const [searchTerm, setSearchTerm] = useState('')
@@ -78,9 +78,31 @@ export default function InventoryPage() {
       try {
         await deleteProduct(id)
         await loadData()
-      } catch (error) {
+        alert(`Product "${name}" deleted successfully!`)
+      } catch (error: any) {
         console.error('Error deleting product:', error)
-        alert('Error deleting product')
+        const errorMessage = error.message || 'Error deleting product'
+        
+        // If it's a foreign key constraint error, offer to delete sales records
+        if (errorMessage.includes('sales records')) {
+          const deleteWithSales = confirm(
+            `${errorMessage}\n\nWould you like to delete ALL sales records for this product first? This action cannot be undone!\n\nClick OK to delete all sales records and the product, or Cancel to keep everything.`
+          )
+          
+          if (deleteWithSales) {
+            try {
+              await deleteAllSalesForProduct(id)
+              await deleteProduct(id)
+              await loadData()
+              alert(`Product "${name}" and all its sales records deleted successfully!`)
+            } catch (deleteError: any) {
+              console.error('Error force deleting product:', deleteError)
+              alert(`Error during force deletion: ${deleteError.message || 'Unknown error'}`)
+            }
+          }
+        } else {
+          alert(errorMessage)
+        }
       }
     }
   }
