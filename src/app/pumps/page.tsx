@@ -22,7 +22,7 @@ import {
   Database
 } from 'lucide-react'
 
-import { getContainers, getPumps, togglePumpStatus, resetDailyCounters, recordFuelSale, addPump, addContainer, updateContainer, deleteContainer, getFuelPrice, refillContainer } from '@/lib/database'
+import { getContainers, getPumps, togglePumpStatus, resetDailyCounters, recordFuelSale, addPump, addContainer, updateContainer, deleteContainer, deletePump, getFuelPrice, refillContainer } from '@/lib/database'
 
 export default function PumpsPage() {
   const [selectedPump, setSelectedPump] = useState<string | null>(null)
@@ -195,7 +195,7 @@ export default function PumpsPage() {
         container_id: containerId,
         fuel_type: selectedContainer.fuel_type,
         is_active: true,
-        total_counter: 0,
+        total_counter: parseFloat(formData.get('initial_counter') as string) || 0,
         daily_counter: 0
       })
       
@@ -205,6 +205,18 @@ export default function PumpsPage() {
     } catch (error) {
       console.error('Error adding pump:', error)
       alert('Error adding pump')
+    }
+  }
+
+  const handleDeletePump = async (id: string, name: string) => {
+    if (confirm(`Are you sure you want to delete pump "${name}"?`)) {
+      try {
+        await deletePump(id)
+        await loadData()
+      } catch (error) {
+        console.error('Error deleting pump:', error)
+        alert('Error deleting pump')
+      }
     }
   }
 
@@ -488,6 +500,20 @@ export default function PumpsPage() {
                     </p>
                   )}
                 </div>
+                <div className="space-y-2">
+                  <Label htmlFor="pump-initial-counter">Initial Counter Reading (Liters)</Label>
+                  <Input 
+                    id="pump-initial-counter" 
+                    name="initial_counter"
+                    type="number" 
+                    step="0.01"
+                    placeholder="0" 
+                    className="focus:ring-2 focus:ring-blue-500"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Set the starting counter reading for this pump (optional, defaults to 0)
+                  </p>
+                </div>
                 <div className="flex gap-2 pt-2">
                   <Button type="button" variant="outline" className="flex-1" onClick={() => setIsAddPumpOpen(false)}>
                     Cancel
@@ -602,6 +628,15 @@ export default function PumpsPage() {
                   
                   <Button variant="outline" size="sm">
                     <Settings className="h-4 w-4" />
+                  </Button>
+                  
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    className="text-red-600 hover:text-red-700"
+                    onClick={() => handleDeletePump(pump.id, pump.name)}
+                  >
+                    <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
               </CardContent>

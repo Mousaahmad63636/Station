@@ -470,6 +470,15 @@ export const addPump = async (pump: Omit<Pump, 'id' | 'created_at' | 'updated_at
   return data[0]
 }
 
+export const deletePump = async (id: string) => {
+  const { error } = await supabase
+    .from('pumps')
+    .delete()
+    .eq('id', id)
+  
+  if (error) throw error
+}
+
 // Product functions
 export const getProducts = async (): Promise<Product[]> => {
   const { data, error } = await supabase
@@ -504,6 +513,15 @@ export const updateProduct = async (id: string, updates: Partial<Product>) => {
   const { error } = await supabase
     .from('products')
     .update(updates)
+    .eq('id', id)
+  
+  if (error) throw error
+}
+
+export const deleteProduct = async (id: string) => {
+  const { error } = await supabase
+    .from('products')
+    .delete()
     .eq('id', id)
   
   if (error) throw error
@@ -546,6 +564,15 @@ export const getSalesByDateRange = async (startDate: string, endDate: string): P
   
   if (error) throw error
   return data || []
+}
+
+export const deleteSale = async (id: string) => {
+  const { error } = await supabase
+    .from('sales')
+    .delete()
+    .eq('id', id)
+  
+  if (error) throw error
 }
 
 // Expense functions

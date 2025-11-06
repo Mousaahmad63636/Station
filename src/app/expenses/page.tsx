@@ -141,6 +141,18 @@ export default function ExpensesPage() {
     }
   }
 
+  const handleDeleteExpense = async (id: string, description: string) => {
+    if (confirm(`Are you sure you want to delete expense "${description}"?`)) {
+      try {
+        await deleteExpense(id)
+        await loadData()
+      } catch (error) {
+        console.error('Error deleting expense:', error)
+        alert('Error deleting expense')
+      }
+    }
+  }
+
   // Get all categories for filtering (from database + 'all' option)
   const allCategories = ['all', ...expenseCategories.map(c => c.name)]
 
@@ -492,7 +504,12 @@ export default function ExpensesPage() {
                       <Button variant="ghost" size="icon">
                         <Edit className="h-4 w-4" />
                       </Button>
-                      <Button variant="ghost" size="icon" className="text-red-500">
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="text-red-600 hover:text-red-700"
+                        onClick={() => handleDeleteExpense(expense.id, expense.description)}
+                      >
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>

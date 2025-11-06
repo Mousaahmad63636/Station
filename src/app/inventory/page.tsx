@@ -16,9 +16,10 @@ import {
   Edit,
   AlertTriangle,
   Barcode,
-  DollarSign
+  DollarSign,
+  Trash2
 } from 'lucide-react'
-import { getProducts, addProduct, updateProduct, updateProductStock, getCategories } from '@/lib/database'
+import { getProducts, addProduct, updateProduct, updateProductStock, deleteProduct, getCategories } from '@/lib/database'
 
 export default function InventoryPage() {
   const [searchTerm, setSearchTerm] = useState('')
@@ -69,6 +70,18 @@ export default function InventoryPage() {
     } catch (error) {
       console.error('Error adding product:', error)
       alert('Error adding product')
+    }
+  }
+
+  const handleDeleteProduct = async (id: string, name: string) => {
+    if (confirm(`Are you sure you want to delete product "${name}"?`)) {
+      try {
+        await deleteProduct(id)
+        await loadData()
+      } catch (error) {
+        console.error('Error deleting product:', error)
+        alert('Error deleting product')
+      }
     }
   }
 
@@ -310,6 +323,14 @@ export default function InventoryPage() {
                           </div>
                         </DialogContent>
                       </Dialog>
+                      <Button 
+                        variant="ghost" 
+                        size="icon"
+                        className="text-red-600 hover:text-red-700"
+                        onClick={() => handleDeleteProduct(product.id, product.name)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </div>
                   </TableCell>
                 </TableRow>
